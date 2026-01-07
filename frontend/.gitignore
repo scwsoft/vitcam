@@ -38,4 +38,8 @@ next-env.d.ts
 
 certificates
 
-*.pyc
+.pyc*
+
+/vitcam-server/
+*
+
