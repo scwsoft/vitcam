@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  nextjs:
+    image: nextjs:latest
+    container_name: nextjs
+    ports:
+      - "3000:3000"
+    restart: always
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/ssl:/etc/nginx/ssl:ro
+    restart: always
