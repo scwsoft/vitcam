@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  vitcam-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vitcam-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET:-vitcam-recordings}
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  #TURN/STUN Server (Coturn)
+  turn-server:
+    image: coturn/coturn:latest
+    environment:
+      - DETECT_RELAY_IP=yes
+      - DETECT_EXTERNAL_IP=yes
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./coturn/logs:/var/log/coturn
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_peer -n -p 3478 -h localhost || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: ["-c", "/etc/turnserver.conf", "-v"]
+
