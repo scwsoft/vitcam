@@ -68,7 +68,6 @@ MarkupSafe==2.1.5
 matplotlib==3.10.3
 matplotlib-inline==0.2.1
 minio==7.2.16
-mkl-service==2.4.0
 multidict==6.4.4
 networkx==3.3
 ninja==1.13.0
