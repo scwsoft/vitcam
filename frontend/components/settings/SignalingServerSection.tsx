@@ -31,7 +31,7 @@ export const SignalingServerSection = ({
         <div className="flex items-center">
           <Server className="w-6 h-6 text-blue-600 dark:text-blue-400 mr-2" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Signaling Server
+            ViTCam Server
           </h2>
         </div>
         <div className="flex items-center">

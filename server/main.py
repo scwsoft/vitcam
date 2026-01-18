@@ -243,8 +243,13 @@ async def handle_websocket(websocket):
                                 key = f"{rtsp_url}_{screen_type}_{motion_detection}"
                                 active_tracks[key] = video_track
                                 
-                                video_sender = peer_connection.addTrack(video_track)
-                                force_codec(peer_connection, video_sender, 'video/VP9')
+                                # video_sender = peer_connection.addTrack(video_track)
+                                video_senders = peer_connection.getSenders() 
+                                
+                                if not any(video_sender.track == active_tracks[key] for video_sender in video_senders):
+                                  peer_connection.addTrack(active_tracks[key])
+
+                                #   force_codec(peer_connection, video_sender, 'video/VP9')
                         
                         except Exception as e:
                             logger.error(f"Error setting up video track: {e}")
