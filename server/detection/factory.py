@@ -42,18 +42,25 @@ class CameraPredictorFactory:
         Returns:
             Dictionary with model, processor, and annotators
         """
+
         try:
-            DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            model = RFDETRNano(resolution=640)
+            
+            device = None
+
+            if torch.cuda.is_available(): device = "cuda"
+            elif torch.backends.mps.is_available(): device = "mps"
+            else : device ="cpu"
+
+            model = RFDETRNano(resolution=640, device=device)
             model.optimize_for_inference(compile=False) 
-            logger.info(f"Loading model RFDETRMedium on device: {DEVICE}")
+            logger.info(f"Loading model RFDETRMedium on device: {device}")
 
             
             box_annotator = sv.BoxAnnotator(thickness=1)
             label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
             
             return {
-                'device': DEVICE,
+                'device': device,
                 'model': model,
                 'box_annotator': box_annotator,
                 'label_annotator': label_annotator
