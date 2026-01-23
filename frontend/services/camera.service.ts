@@ -97,48 +97,46 @@ export class CameraService {
     if (error) throw error
   }
 
-  private static transformFormDataToPayload(formData: CameraFormData) {
-    // Match original implementation:
-    // If ALL classes are selected, save as empty string (optimization)
-    // Otherwise, save the specific class IDs as comma-separated string
-    const allClassNames = Object.values(DETECTION_CLASSES)
-    const isAllSelected = formData.odclasses.length === allClassNames.length
+private static transformFormDataToPayload(formData: CameraFormData) {
+  // Map selected class names to their IDs
+  const allClassNames = Object.values(DETECTION_CLASSES)
+  const isAllSelected = formData.odclasses.length === allClassNames.length
+  
+  let odclassesString = ''
+  
+  if (isAllSelected) {
+    // All classes selected = store all class IDs explicitly
+    const allClassIds = Object.keys(DETECTION_CLASSES)
+    odclassesString = allClassIds.join(',')
+  } else if (formData.odclasses.length > 0) {
+    // Specific classes selected = store their IDs
+    const selectedClassIds = formData.odclasses
+      .map(className => {
+        const entry = Object.entries(DETECTION_CLASSES).find(
+          ([, name]) => name === className
+        )
+        return entry ? entry[0] : null
+      })
+      .filter(id => id !== null)
     
-    let odclassesString = ''
-    
-    if (isAllSelected) {
-      // All classes selected = store as empty string
-      odclassesString = ''
-    } else if (formData.odclasses.length > 0) {
-      // Specific classes selected = store their IDs
-      const selectedClassIds = formData.odclasses
-        .map(className => {
-          const entry = Object.entries(DETECTION_CLASSES).find(
-            ([, name]) => name === className
-          )
-          return entry ? entry[0] : null
-        })
-        .filter(id => id !== null)
-      
-      odclassesString = selectedClassIds.join(',')
-    }
-    // else: no classes selected = empty string (same as all selected)
-
-    return {
-      name: formData.name,
-      type: formData.type,
-      url: formData.url,
-      description: formData.description,
-      odthredshold: formData.odthredshold,
-      is_detection: formData.is_detection,
-      odclasses: odclassesString,
-      encoder: formData.encoder,
-      resolution: formData.resolution,
-      fps: formData.fps,
-      rectype: formData.rectype
-    }
+    odclassesString = selectedClassIds.join(',')
   }
+  // else: no classes selected = empty string
 
+  return {
+    name: formData.name,
+    type: formData.type,
+    url: formData.url,
+    description: formData.description,
+    odthredshold: formData.odthredshold,
+    is_detection: formData.is_detection,
+    odclasses: odclassesString,
+    encoder: formData.encoder,
+    resolution: formData.resolution,
+    fps: formData.fps,
+    rectype: formData.rectype
+  }
+}
   static parseOdclassesFromDb(odclasses: string): string[] {
     // If odclasses is empty or not set, default to ALL classes
     // This matches the original implementation behavior
