@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+
   vitcam-frontend:
     build:
       context: ./frontend
@@ -8,13 +9,52 @@ services:
     container_name: vitcam-frontend
     ports:
       - "3000:3000"
+      - "50000-50050:50000-50050/udp"
+      - "19302:19302"
+
+    deploy:
+      resources:
+        reservations:
+              devices:
+                - driver: nvidia
+                  count: all # or specify a specific device, e.g., '0'
+                  capabilities: [gpu]
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_BUCKET=${SUPABASE_BUCKET:-vitcam-recordings}
       - PYTHONUNBUFFERED=1
+    volumes:
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+      - ./certs:/app/certs
     restart: unless-stopped
 
+  signaling-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8554:8554"
+      - "8765:8765"
+      - "3478:3478"
+      - "16384:65535"
+       
+    deploy:
+      resources:
+        reservations:
+              devices:
+                - driver: nvidia
+                  count: all # or specify a specific device, e.g., '0'
+                  capabilities: [gpu]
+ 
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL:-http://192.168.68.109:54321}
+      - SUPABASE_KEY=${SUPABASE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
+      - SUPABASE_BUCKET=${SUPABASE_BUCKET:-vitcam-recordings}
+    restart: unless-stopped
+  
+  
   #TURN/STUN Server (Coturn)
   turn-server:
     image: coturn/coturn:latest
@@ -25,6 +65,8 @@ services:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./coturn/logs:/var/log/coturn
     restart: unless-stopped
+    #networks:
+    #   - vitcam-network
     healthcheck:
       test: ["CMD-SHELL", "turnutils_peer -n -p 3478 -h localhost || exit 1"]
       interval: 30s
@@ -33,3 +75,9 @@ services:
       start_period: 10s
     command: ["-c", "/etc/turnserver.conf", "-v"]
 
+  #Redis for session management (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
