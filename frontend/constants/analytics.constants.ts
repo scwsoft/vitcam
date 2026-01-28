@@ -1,49 +1,40 @@
 /**
  * Analytics Constants
- * Shared constants for the video analytics dashboard
- * UPDATED: Added 1min, 15min, 30min date range options
+ * Centralized configuration for analytics features
  */
 
+export const ANALYTICS_CONFIG = {
+  REALTIME_CHANNEL: 'detection_changes',
+  TABLE_NAME: 'object_detection_events',
+  VIEW_NAME: 'unique_tracker_id_view',
+  DEFAULT_TIME_RANGE: 'day' as const,
+  LIVE_FEED_LIMIT: 10,
+  REFRESH_DEBOUNCE_MS: 300,
+} as const;
+
+export const TIME_RANGES = {
+  HOUR: 60 * 60 * 1000,
+  DAY: 24 * 60 * 60 * 1000,
+  WEEK: 7 * 24 * 60 * 60 * 1000,
+  MONTH: 30 * 24 * 60 * 60 * 1000,
+} as const;
+
 export const CHART_COLORS = [
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#ec4899', // pink
-  '#6366f1', // indigo
-  '#84cc16', // lime
+  '#8b5cf6',
+  '#ec4899',
+  '#f59e0b',
+  '#10b981',
+  '#3b82f6',
+  '#ef4444',
+  '#14b8a6',
+  '#f97316',
+  '#06b6d4',
+  '#a855f7',
 ] as const;
 
-export const DATE_RANGE_OPTIONS = {
-  '1min': 'Last 1 Minute',
-  '15min': 'Last 15 Minutes',
-  '30min': 'Last 30 Minutes',
-  '1h': 'Last Hour',
-  '24h': 'Last 24 Hours',
-  '7d': 'Last 7 Days',
-  '30d': 'Last 30 Days',
-} as const;
-
-export const DATE_RANGE_MS = {
-  '1min': 60 * 1000,
-  '15min': 15 * 60 * 1000,
-  '30min': 30 * 60 * 1000,
-  '1h': 60 * 60 * 1000,
-  '24h': 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000,
-  '30d': 30 * 24 * 60 * 60 * 1000,
-} as const;
-
-export const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
-
-export const DEFAULT_PAGE_SIZE = 100;
-
-export const MAX_CHART_ITEMS = 8;
-
-export const MAX_DURATION_ITEMS = 10;
-
-export const CONFIDENCE_THRESHOLDS = {
-  EXCELLENT: 85,
-  GOOD: 70,
+export const EXPORT_CONFIG = {
+  FILE_PREFIX: 'detections',
+  FILE_EXTENSION: '.csv',
+  MIME_TYPE: 'text/csv',
+  HEADERS: ['Timestamp', 'Camera', 'Object Class', 'Confidence', 'Position'],
 } as const;

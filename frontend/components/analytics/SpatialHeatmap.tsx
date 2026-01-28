@@ -56,7 +56,7 @@ const SpatialHeatmap: React.FC<SpatialHeatmapProps> = ({ detections }) => {
       </div>
 
       {/* Heatmap Grid */}
-      <div className="aspect-video bg-slate-900/50 rounded-xl p-4 relative">
+      <div className="aspect-video bg-slate-300/50 dark:bg-slate-900/50 rounded-xl p-4 relative">
         <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(20, 1fr)` }}>
           {heatmapData.grid.map((row, y) =>
             row.map((value, x) => (

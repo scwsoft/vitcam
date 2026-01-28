@@ -1,92 +1,152 @@
 /**
  * Analytics Service
- * Handles all API interactions for analytics data
+ * Handles all data fetching and subscriptions for analytics
  */
 
-import type {
-  DashboardData,
-  AnalyticsResponse,
-  DateRangeOption,
-} from '@/types/analytics.types';
-import { formatDateTimeForAPI, getDateRangeMs } from '@/utils/analytics.utils';
+import type { SupabaseClient } from '@supabase/auth-helpers-nextjs';
+import type { DetectionEvent, AnalyticsFilters } from '@/types/analytics.types';
+import { ANALYTICS_CONFIG } from '@/constants/analytics.constants';
+import * as AnalyticsUtils from '@/utils/analytics.utils';
 
-const ANALYTICS_API =
-  process.env.NEXT_PUBLIC_ANALYTICS_API || 'http://localhost:8766/api/analytics';
+export class AnalyticsService {
+  constructor(private supabase: SupabaseClient) {}
 
-/**
- * Get empty dashboard data structure
- */
-const getEmptyDashboardData = (): DashboardData => ({
-  summary: {
-    total_events: 0,
-    total_cameras: 0,
-    date_range: {
-      start: new Date().toISOString(),
-      end: new Date().toISOString(),
-    },
-    stats: [],
-  },
-  recent_events: [],
-  hourly_distribution: Object.fromEntries(Array.from({ length: 24 }, (_, i) => [String(i), 0])),
-  top_objects: [],
-  cameras: [],
-});
+  /**
+   * Fetch detection events with applied filters
+   */
+  async fetchDetections(filters: AnalyticsFilters): Promise<DetectionEvent[]> {
+    try {
+      let query = this.supabase
+        .from(ANALYTICS_CONFIG.TABLE_NAME)
+        .select('*')
+        .order('timestamp', { ascending: false });
 
-interface FetchDashboardParams {
-  dateRange: DateRangeOption;
-  cameraFilter: string;
-  page: number;
-  pageSize: number;
-  cursor?: string | null;
-}
+      // Apply camera filter
+      if (filters.cameraIds.length > 0) {
+        query = query.in('camera_id', filters.cameraIds);
+      }
 
-/**
- * Fetch dashboard data from analytics API
- */
-export const fetchDashboardData = async (
-  params: FetchDashboardParams
-): Promise<DashboardData> => {
-  try {
-    const endDate = formatDateTimeForAPI(new Date());
-    const startDate = formatDateTimeForAPI(new Date(Date.now() - getDateRangeMs(params.dateRange)));
+      // Apply object class filter
+      if (filters.objectClasses.length > 0) {
+        query = query.in('object_class_name', filters.objectClasses);
+      }
 
-    const searchParams = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      page: params.page.toString(),
-      page_size: params.pageSize.toString(),
-    });
+      // Apply confidence filter
+      if (filters.confidenceMin > 0) {
+        query = query.gte('confidence', filters.confidenceMin);
+      }
 
-    if (params.cursor) {
-      searchParams.append('cursor', params.cursor);
+      // Apply time range filter
+      const startTime = AnalyticsUtils.calculateTimeRangeStart(
+        filters.timeRange,
+        filters.startDate
+      );
+      query = query.gte('timestamp', startTime.toISOString());
+
+      if (filters.timeRange === 'custom' && filters.endDate) {
+        query = query.lte('timestamp', filters.endDate.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to fetch detections: ${error.message}`);
+      }
+
+      return (data as DetectionEvent[]) || [];
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`[AnalyticsService] ${errorMessage}`);
     }
-
-    if (params.cameraFilter !== 'all') {
-      searchParams.append('camera_name', params.cameraFilter);
-    }
-
-    const apiUrl = `${ANALYTICS_API}/dashboard?${searchParams}`;
-
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result: AnalyticsResponse = await response.json();
-
-    if (result.success && result.data) {
-      return result.data;
-    } else {
-      return getEmptyDashboardData();
-    }
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    return getEmptyDashboardData();
   }
-};
+
+  /**
+   * Subscribe to real-time detection events
+   */
+  subscribeToDetections(
+    onInsert: (detection: DetectionEvent) => void
+  ): () => void {
+    const channel = this.supabase
+      .channel(ANALYTICS_CONFIG.REALTIME_CHANNEL)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: ANALYTICS_CONFIG.TABLE_NAME,
+        },
+        (payload) => {
+          onInsert(payload.new as DetectionEvent);
+        }
+      )
+      .subscribe();
+
+    // Return cleanup function
+    return () => {
+      this.supabase.removeChannel(channel);
+    };
+  }
+
+  /**
+   * Fetch available cameras for filtering
+   */
+  async fetchAvailableCameras(): Promise<Array<{ id: number; name: string }>> {
+    try {
+      const { data, error } = await this.supabase
+        .from(ANALYTICS_CONFIG.TABLE_NAME)
+        .select('camera_id, camera_name')
+        .order('camera_id');
+
+      if (error) {
+        throw new Error(`Failed to fetch cameras: ${error.message}`);
+      }
+
+      // Get unique cameras
+      const uniqueCameras = new Map<number, string>();
+      data?.forEach((item) => {
+        if (!uniqueCameras.has(item.camera_id)) {
+          uniqueCameras.set(
+            item.camera_id,
+            item.camera_name || `Camera ${item.camera_id}`
+          );
+        }
+      });
+
+      return Array.from(uniqueCameras.entries()).map(([id, name]) => ({
+        id,
+        name,
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn(`[AnalyticsService] ${errorMessage}`);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch available object classes for filtering
+   */
+  async fetchAvailableObjectClasses(): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from(ANALYTICS_CONFIG.TABLE_NAME)
+        .select('object_class_name')
+        .order('object_class_name');
+
+      if (error) {
+        throw new Error(`Failed to fetch object classes: ${error.message}`);
+      }
+
+      // Get unique object classes
+      const uniqueClasses = new Set(
+        data?.map((item) => item.object_class_name).filter(Boolean)
+      );
+
+      return Array.from(uniqueClasses);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn(`[AnalyticsService] ${errorMessage}`);
+      return [];
+    }
+  }
+}
