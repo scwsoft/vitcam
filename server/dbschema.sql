@@ -74,9 +74,6 @@ CREATE INDEX IF NOT EXISTS idx_object_detection_events_image_url
 ON object_detection_events(image_url) 
 WHERE image_url IS NOT NULL;
 
-CREATE VIEW unique_tracker_id_view AS
-SELECT DISTINCT tracker_id FROM object_detection_events;
-
 create table public.profiles (
   id uuid not null,
   username text null,
