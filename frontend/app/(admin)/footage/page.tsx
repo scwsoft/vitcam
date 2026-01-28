@@ -1,8 +1,9 @@
 /**
- * COMPLETELY FIXED VideoManagementPage Component
+ * COMPLETELY FIXED VideoManagementPage Component with Working List View
  * - Fixed search/filter layout
  * - Proper thumbnail display using video element
  * - Better duration handling
+ * - WORKING LIST VIEW with table layout
  * - Matches original design exactly
  */
 
@@ -202,8 +203,8 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
+      <div className="fixed inset-0  bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-[#1a2332] rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -310,11 +311,11 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${className}`}>
-      <div className="container mx-auto px-4 py-6">
+    <div className={`min-h-screen bg-gray-50 dark:bg-[#1a2332] ${className}`}>
+      <div className="container mx-auto px-4 py-6 bg-white dark:bg-[#1a2332]">
         {/* Header with Title and Refresh */}
         <div className="mb-6 flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-white">Video Management</h1>
+          <h1 className="text-2xl font-bold  text-gray-900 dark:text-gray-100">Video Management</h1>
           <button
             onClick={fetchVideos}
             disabled={isLoading}
@@ -334,7 +335,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
             placeholder="Search videos..."
             value={filters.searchQuery}
             onChange={(e) => updateFilters({ searchQuery: e.target.value })}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 bg-white dark:bg-[#1a2332] border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -342,11 +343,11 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
         <div className="mb-4 flex flex-wrap gap-3 items-center">
           {/* Camera Filter */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-300 whitespace-nowrap">Camera:</label>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Camera:</label>
             <select
               value={filters.cameraFilter}
               onChange={(e) => updateFilters({ cameraFilter: e.target.value })}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100  border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Cameras</option>
               {cameras.map((camera) => (
@@ -357,11 +358,11 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
 
           {/* Type Filter */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-300 whitespace-nowrap">Type:</label>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Type:</label>
             <select
               value={filters.typeFilter}
               onChange={(e) => updateFilters({ typeFilter: e.target.value as any })}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Types</option>
               <option value="motion">Motion</option>
@@ -371,8 +372,8 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
 
           {/* View Mode */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-300 whitespace-nowrap">View:</label>
-            <div className="flex gap-1 p-1 bg-gray-700 rounded-lg">
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">View:</label>
+            <div className="flex gap-1 p-1 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`px-3 py-1 rounded text-sm ${
@@ -398,11 +399,11 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
 
           {/* Per Page */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-300 whitespace-nowrap">Per page:</label>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Per page:</label>
             <select
               value={itemsPerPage}
               onChange={(e) => updateItemsPerPage(Number(e.target.value))}
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100  border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value={12}>12</option>
               <option value={24}>24</option>
@@ -447,11 +448,21 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
 
         {/* Loading State */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: itemsPerPage }).map((_, i) => (
-              <SkeletonGridCard key={i} />
-            ))}
-          </div>
+          <>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {Array.from({ length: itemsPerPage }).map((_, i) => (
+                  <SkeletonGridCard key={i} />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Array.from({ length: itemsPerPage }).map((_, i) => (
+                  <SkeletonListRow key={i} />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Empty State */}
@@ -462,119 +473,265 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
           />
         )}
 
-        {/* Video Grid */}
+        {/* Video Content - Grid or List View */}
         {!isLoading && !error && videos.length > 0 && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-              {videos.map((video) => (
-                <div
-                  key={video.id}
-                  className="bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group"
-                >
-                  {/* Thumbnail with Video Element */}
-                  <div className="relative aspect-video bg-gray-700">
-                    <video
-                      className="w-full h-full object-cover"
-                      preload="metadata"
-                      muted
-                      playsInline
-                      onLoadedMetadata={(e) => {
-                        // This helps load the first frame
-                        const videoEl = e.currentTarget;
-                        videoEl.currentTime = 0.1;
-                      }}
-                    >
-                      <source src={video.publicUrl} type={video.mimeType || 'video/webm'} />
-                    </video>
-                    
-                    {/* Type Badge */}
-                    <div className={`absolute top-2 left-2 px-2 py-1 rounded text-xs text-white font-medium ${getVideoTypeColor(video.type)}`}>
-                      {video.type.toUpperCase()}
-                    </div>
-
-                    {/* Size Badge */}
-                    <div className="absolute top-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs text-white">
-                      {video.size}
-                    </div>
-
-                    {/* Duration Badge */}
-                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs text-white">
-                      {video.duration}
-                    </div>
-
-                    {/* Play Overlay */}
-                    <button
-                      onClick={() => handleVideoSelect(video)}
-                      className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 opacity-0 group-hover:opacity-100"
-                    >
-                      <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform">
-                        <svg className="w-8 h-8 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
+            {viewMode === 'grid' ? (
+              // GRID VIEW
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+                {videos.map((video) => (
+                  <div
+                    key={video.id}
+                    className="bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group"
+                  >
+                    {/* Thumbnail with Video Element */}
+                    <div className="relative aspect-video bg-gray-700">
+                      <video
+                        className="w-full h-full object-cover"
+                        preload="metadata"
+                        muted
+                        playsInline
+                        onLoadedMetadata={(e) => {
+                          const videoEl = e.currentTarget;
+                          videoEl.currentTime = 0.1;
+                        }}
+                      >
+                        <source src={video.publicUrl} type={video.mimeType || 'video/webm'} />
+                      </video>
+                      
+                      {/* Type Badge */}
+                      <div className={`absolute top-2 left-2 px-2 py-1 rounded text-xs text-white font-medium ${getVideoTypeColor(video.type)}`}>
+                        {video.type.toUpperCase()}
                       </div>
-                    </button>
-                  </div>
 
-                  {/* Info Section */}
-                  <div className="p-4">
-                    <h3 className="text-sm font-medium text-white truncate mb-2" title={video.name}>
-                      {video.name}
-                    </h3>
-                    
-                    <div className="space-y-1 text-xs text-gray-400 mb-4">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        {video.camera}
+                      {/* Size Badge */}
+                      <div className="absolute top-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs text-white">
+                        {video.size}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatDate(video.timestamp)}
-                      </div>
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                      {/* Duration Badge */}
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs text-white">
+                        {video.duration}
+                      </div>
+
+                      {/* Play Overlay */}
                       <button
                         onClick={() => handleVideoSelect(video)}
-                        className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 opacity-0 group-hover:opacity-100"
                       >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                        Play
-                      </button>
-                      <button
-                        onClick={() => handleDownload(video)}
-                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                        title="Download"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => showDeleteConfirmation(video)}
-                        disabled={deletingVideoId === video.id}
-                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {deletingVideoId === video.id ? (
-                          <Loader className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform">
+                          <svg className="w-8 h-8 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
                           </svg>
-                        )}
+                        </div>
                       </button>
                     </div>
+
+                    {/* Info Section */}
+                    <div className="p-4">
+                      <h3 className="text-sm font-medium text-white truncate mb-2" title={video.name}>
+                        {video.name}
+                      </h3>
+                      
+                      <div className="space-y-1 text-xs text-gray-400 mb-4">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          {video.camera}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {formatDate(video.timestamp)}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleVideoSelect(video)}
+                          className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                          Play
+                        </button>
+                        <button
+                          onClick={() => handleDownload(video)}
+                          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                          title="Download"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => showDeleteConfirmation(video)}
+                          disabled={deletingVideoId === video.id}
+                          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                          title="Delete"
+                        >
+                          {deletingVideoId === video.id ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                ))}
+              </div>
+            ) : (
+              // LIST VIEW
+              <div className="mb-6 bg-white dark:bg-[#1a2332] rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-[#0f1419] border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Preview
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Camera
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Duration
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Size
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {videos.map((video) => (
+                        <tr
+                          key={video.id}
+                          className="hover:bg-gray-50 dark:hover:bg-[#0f1419] transition"
+                        >
+                          {/* Preview Thumbnail */}
+                          <td className="px-4 py-3">
+                            <div className="relative w-24 h-14 bg-gray-700 rounded overflow-hidden group cursor-pointer">
+                              <video
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                                muted
+                                playsInline
+                                onLoadedMetadata={(e) => {
+                                  const videoEl = e.currentTarget;
+                                  videoEl.currentTime = 0.1;
+                                }}
+                              >
+                                <source src={video.publicUrl} type={video.mimeType || 'video/webm'} />
+                              </video>
+                              <button
+                                onClick={() => handleVideoSelect(video)}
+                                className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 opacity-0 group-hover:opacity-100"
+                              >
+                                <div className="w-8 h-8 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-blue-600 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                  </svg>
+                                </div>
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Name */}
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 font-medium max-w-xs truncate" title={video.name}>
+                              {video.name}
+                            </div>
+                          </td>
+
+                          {/* Camera */}
+                          <td className="px-4 py-3 ">
+                            <div className="text-sm text-gray-700 dark:text-gray-300">{video.camera}</div>
+                          </td>
+
+                          {/* Type */}
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-xs text-white dark:text-gray-300 font-medium ${getVideoTypeColor(video.type)}`}>
+                              {video.type.toUpperCase()}
+                            </span>
+                          </td>
+
+                          {/* Duration */}
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-700 dark:text-gray-300">{video.duration}</div>
+                          </td>
+
+                          {/* Size */}
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-700 dark:text-gray-300">{video.size}</div>
+                          </td>
+
+                          {/* Date */}
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-700 dark:text-gray-300">{formatDate(video.timestamp)}</div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleVideoSelect(video)}
+                                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                                title="Play"
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDownload(video)}
+                                className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                                title="Download"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => showDeleteConfirmation(video)}
+                                disabled={deletingVideoId === video.id}
+                                className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-50"
+                                title="Delete"
+                              >
+                                {deletingVideoId === video.id ? (
+                                  <Loader className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
             {/* Pagination */}
             <Pagination

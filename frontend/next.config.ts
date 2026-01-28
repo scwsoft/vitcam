@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+     images: {
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: '192.168.68.109',
+        port: '54321',
+        pathname: '/storage/**',
+      },
+    ],
+  },
   output: 'standalone', // Keep this if using Docker
    async headers() {
         return [
