@@ -96,22 +96,27 @@ async def handle_websocket(websocket):
         """Setup WebRTC peer connection"""
         nonlocal peer_connection
         
-        configuration = RTCConfiguration(
-            iceServers=[
-                RTCIceServer(urls=[
-                    "stun:stun.l.google.com:19302",
-                    "stun:stun1.l.google.com:19302",
-                    "stun:stun2.l.google.com:19302",
-                    "stun:stun3.l.google.com:19302",
-                    "stun:stun4.l.google.com:19302"
-                ]),
+        # Load STUN servers from environment configuration
+        if not hasattr(settings, 'WEBRTC_STUN_SERVERS'):
+            raise AttributeError(
+                "WEBRTC_STUN_SERVERS not found in settings. "
+                "Please add WEBRTC_STUN_SERVERS to your .env file and config/settings.py"
+            )
+        
+        stun_servers = settings.WEBRTC_STUN_SERVERS.split(',')
+        ice_servers = [RTCIceServer(urls=stun_servers)]
+        
+        # Add TURN server if configured
+        if hasattr(settings, 'WEBRTC_TURN_SERVER'):
+            ice_servers.append(
                 RTCIceServer(
-                    urls=["turn:127.0.0.1:3478"], 
-                    username="webrtc", 
-                    credential="webrtc123"
+                    urls=[settings.WEBRTC_TURN_SERVER],
+                    username=settings.WEBRTC_TURN_USERNAME,
+                    credential=settings.WEBRTC_TURN_CREDENTIAL
                 )
-            ]
-        )
+            )
+        
+        configuration = RTCConfiguration(iceServers=ice_servers)
         
         new_pc = RTCPeerConnection(configuration=configuration)
         new_pc = connection_manager.add_connection(new_pc)
@@ -361,11 +366,11 @@ async def handle_websocket(websocket):
                 
                 elif data["type"] == "ice_candidate":
                     if peer_connection:
-                        candidate = RTCIceCandidate(
-                            sdpMid=data["candidate"]["sdpMid"],
-                            sdpMLineIndex=data["candidate"]["sdpMLineIndex"],
-                            candidate=data["candidate"]["candidate"]
-                        )
+                        # Parse the SDP candidate string
+                        candidate_sdp = data["candidate"]["candidate"]
+                        candidate = RTCIceCandidate.from_sdp(candidate_sdp)
+                        candidate.sdpMid = data["candidate"]["sdpMid"]
+                        candidate.sdpMLineIndex = data["candidate"]["sdpMLineIndex"]
                         await peer_connection.addIceCandidate(candidate)
                 
             except json.JSONDecodeError:

@@ -3,7 +3,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Square, RotateCcw, Maximize, Minimize, VideoOff, CircleDot, Circle, PlayIcon } from 'lucide-react';
 import {ICameraProps} from "@types/CameraType";
 
-export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName}: ICameraProps){
+interface VideoPlayerProps extends ICameraProps {
+  stunServers?: string[];
+}
+
+export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName, stunServers}: VideoPlayerProps){
   const [isPlaying, setIsPlaying] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [showControls, setShowControls] = useState(false);
@@ -143,22 +147,13 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
 
       console.log(`[${Name}] Initializing WebRTC connection...`);
       
-      peerConnection.current = new RTCPeerConnection({
-        iceServers: [
-          // { urls: 'stun:stun.l.google.com:19302' },
-          // { urls: 'stun:stun1.l.google.com:19302' },
-             { urls: "stun:stun.l.google.com:19302" },
-             { urls: "stun:stun.l.google.com:5349" },
-             { urls: "stun:stun1.l.google.com:3478" },
-             { urls: "stun:stun1.l.google.com:5349" },
-             { urls: "stun:stun2.l.google.com:19302" },
-             { urls: "stun:stun2.l.google.com:5349" },
-             { urls: "stun:stun3.l.google.com:3478" },
-             { urls: "stun:stun3.l.google.com:5349" },
-             { urls: "stun:stun4.l.google.com:19302" },
-             { urls: "stun:stun4.l.google.com:5349" }
-        ]
-      });
+      
+      // Use STUN servers from props
+      const iceServers: RTCIceServer[] = stunServers && stunServers.length > 0
+        ? stunServers.map(url => ({ urls: url }))
+        : [];
+      
+      peerConnection.current = new RTCPeerConnection({ iceServers });
       
       peerConnection.current.addTransceiver('video', { direction: 'recvonly' });
 

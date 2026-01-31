@@ -18,7 +18,7 @@ export const FORMAT_EXAMPLES: Record<string, string> = {
 
 export const DEFAULT_SIGNALING_SERVER = {
   protocol: 'ws' as const,
-  ip: 'localhost',
+  ip: '127.0.0.1',
   port: '8765',
   name: '',
 };

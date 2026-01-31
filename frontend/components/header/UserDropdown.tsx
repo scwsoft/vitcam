@@ -24,9 +24,6 @@ export default function UserDropdown() {
   const supabase = createClient();
   
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, [supabase]);
 
   const fetchUserProfile = async () => {
     try {
@@ -93,6 +90,10 @@ export default function UserDropdown() {
     return userProfile?.avatar_url || '/images/avatar.png';
   };
 
+  useEffect(() => {
+    fetchUserProfile();
+  }, [supabase]);
+
   if (loading) {
     return (
       <div className="relative">
@@ -115,7 +116,7 @@ export default function UserDropdown() {
             <Image
               width={100}
               height={100}
-              src="/images/avatar.png"
+              src={getAvatarSrc()}
               alt="User"
             />
           </span>

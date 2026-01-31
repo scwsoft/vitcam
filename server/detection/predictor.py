@@ -104,7 +104,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         save_detection_images: bool = True,
         image_quality: int = 85,
         storage_bucket: str = "detection-images",
-        frame_color_format: str = "BGR"
+        frame_color_format: str = "BGR",
     ):
         """
         Initialize predictor with analytics
@@ -135,7 +135,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 track_activation_threshold=0.25,
                 lost_track_buffer=30,
                 minimum_matching_threshold=0.8,
-                frame_rate=30
+                frame_rate=camera_config.fps
             )
         except ImportError:
             self.tracker = None
@@ -208,7 +208,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
             annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
 
-            # Log detection events with tracker IDs for analytics (only once per object)
+            # Log detection events with tracker IDs for analytics
             if len(detections) > 0 and self.analytics_manager:
                 asyncio.create_task(
                     self._log_tracked_detections(detections, frame)
@@ -341,12 +341,13 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     async def _log_tracked_detections(self, detections, frame: np.ndarray):
         """
         Log detection events with tracker IDs to analytics.
-        Only logs each tracked object ONCE when first detected to prevent large data storage.
-        Saves detection images with single object bounding box for first-time detections.
+        - NEW trackers: Insert new detection event with image
+        - EXISTING trackers: Update existing detection event (no new image)
         """
         try:
             current_time = datetime.now(tz=timezone.utc)
             new_detections = []
+            update_detections = []
             
             for i in range(len(detections.class_id) if hasattr(detections, 'class_id') else 0):
                 # Extract detection data
@@ -355,73 +356,15 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 confidence = float(detections.confidence[i]) if hasattr(detections, 'confidence') and len(detections.confidence) > i else 0.0
                 tracker_id = int(detections.tracker_id[i]) if hasattr(detections, 'tracker_id') and len(detections.tracker_id) > i else None
                 
-                # Skip if no tracker ID or already logged
-                if tracker_id is None or tracker_id in self.logged_tracker_ids:
+                # Skip if no tracker ID
+                if tracker_id is None:
                     continue
                 
-                # Mark as logged
-                self.logged_tracker_ids.add(tracker_id)
+                # Determine if this is a new or existing tracker
+                is_new_tracker = tracker_id not in self.logged_tracker_ids
                 
                 # Get class name with bounds checking
                 class_name = COCO_CLASSES[class_id]
-                
-                # Save detection image with ONLY this object's bounding box
-                image_url = None
-                if self.save_detection_images and self.supabase_client:
-                    try:
-                        # Create annotated frame with ONLY this object's bounding box
-                        annotated_frame = frame.copy()
-                        
-                        # Create single detection for this specific object
-                        single_detection = sv.Detections(
-                            xyxy=np.array([bbox]),
-                            confidence=np.array([confidence]),
-                            class_id=np.array([class_id]),
-                            tracker_id=np.array([tracker_id])
-                        )
-                        
-                        # Annotate with bounding box and label
-                        label = f"{class_name} {confidence:.2f}"
-                        annotated_frame = self.box_annotator.annotate(
-                            scene=annotated_frame, 
-                            detections=single_detection
-                        )
-                        annotated_frame = self.label_annotator.annotate(
-                            scene=annotated_frame, 
-                            detections=single_detection, 
-                            labels=[label]
-                        )
-                        
-                        image_url = await self._save_detection_image(
-                            frame=annotated_frame,
-                            tracker_id=tracker_id,
-                            class_name=class_name,
-                            bbox=bbox
-                        )
-
-                        # # Generate filename with timestamp (use current_time for consistency)
-                        # filename = f"detection_{self.camera_config.name}_{tracker_id}_{current_time.strftime('%Y%m%d_%H%M%S_%f')}.jpg"
-                        
-                        # # Convert to JPEG bytes
-                        # _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                        # image_bytes = buffer.tobytes()
-                        
-                        # # Upload to Supabase Storage
-                        # storage_path = f"{self.camera_config.name}/{filename}"
-                        # result = self.supabase_client.storage.from_('detection-images').upload(
-                        #     path=storage_path,
-                        #     file=image_bytes,
-                        #     file_options={"content-type": "image/jpeg"}
-                        # )
-                        
-                        # if result:
-                        #     # Get public URL
-                        #     public_url = self.supabase_client.storage.from_('detection-images').get_public_url(storage_path)
-                        #     image_url = public_url
-                        #     logger.info(f"[{self.camera_config.name}] Saved first detection frame for tracker_id {tracker_id} ({class_name})")
-                        
-                    except Exception as img_error:
-                        logger.error(f"[{self.camera_config.name}] Error saving detection image for tracker_id {tracker_id}: {img_error}")
                 
                 # Get tracking metadata
                 track_metadata = {}
@@ -434,53 +377,135 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                         'track_duration': time.time() - track_info.get('first_seen', time.time())
                     }
                 
-                detection_event = {
-                    'camera_id': self.camera_config.id,
-                    'camera_name': self.camera_config.name,
-                    'camera_url': self.camera_config.url,
-                    'timestamp': current_time.isoformat(),
-                    'object_class_id': class_id,
-                    'object_class_name': class_name,
-                    'confidence': confidence,
-                    'bbox_x': float(bbox[0]) if len(bbox) > 0 else 0.0,
-                    'bbox_y': float(bbox[1]) if len(bbox) > 1 else 0.0,
-                    'bbox_width': float(bbox[2] - bbox[0]) if len(bbox) > 2 else 0.0,
-                    'bbox_height': float(bbox[3] - bbox[1]) if len(bbox) > 3 else 0.0,
-                    'frame_width': frame.shape[1] if len(frame.shape) > 1 else 0,
-                    'frame_height': frame.shape[0] if len(frame.shape) > 0 else 0,
-                    'session_id': self.session_id,
-                    'tracker_id': tracker_id,
-                    'image_url': image_url,
-                    'detection_metadata': {
-                        'model_threshold': self.camera_config.odthreshold / 100.0,
-                        'detection_classes': self.camera_config.detection_classes,
-                        'recording_active': getattr(self.camera_config, 'recording_active', False),
-                        'tracking_metadata': track_metadata,
-                        'is_first_detection': True,
-                        'image_saved': image_url is not None
+                if is_new_tracker:
+                    # NEW TRACKER: Insert new detection with image
+                    self.logged_tracker_ids.add(tracker_id)
+                    
+                    # Save detection image with ONLY this object's bounding box
+                    image_url = None
+                    if self.save_detection_images and self.supabase_client:
+                        try:
+                            # Create annotated frame with ONLY this object's bounding box
+                            annotated_frame = frame.copy()
+                            
+                            # Create single detection for this specific object
+                            single_detection = sv.Detections(
+                                xyxy=np.array([bbox]),
+                                confidence=np.array([confidence]),
+                                class_id=np.array([class_id]),
+                                tracker_id=np.array([tracker_id])
+                            )
+                            
+                            # Annotate with bounding box and label
+                            label = f"{class_name} {confidence:.2f}"
+                            annotated_frame = self.box_annotator.annotate(
+                                scene=annotated_frame, 
+                                detections=single_detection
+                            )
+                            annotated_frame = self.label_annotator.annotate(
+                                scene=annotated_frame, 
+                                detections=single_detection, 
+                                labels=[label]
+                            )
+                            
+                            image_url = await self._save_detection_image(
+                                frame=annotated_frame,
+                                tracker_id=tracker_id,
+                                class_name=class_name,
+                                bbox=bbox
+                            )
+                            
+                        except Exception as img_error:
+                            logger.error(f"[{self.camera_config.name}] Error saving detection image for tracker_id {tracker_id}: {img_error}")
+                    
+                    detection_event = {
+                        'camera_id': self.camera_config.id,
+                        'camera_name': self.camera_config.name,
+                        'camera_url': self.camera_config.url,
+                        'timestamp': current_time.isoformat(),
+                        'object_class_id': class_id,
+                        'object_class_name': class_name,
+                        'confidence': confidence,
+                        'bbox_x': float(bbox[0]) if len(bbox) > 0 else 0.0,
+                        'bbox_y': float(bbox[1]) if len(bbox) > 1 else 0.0,
+                        'bbox_width': float(bbox[2] - bbox[0]) if len(bbox) > 2 else 0.0,
+                        'bbox_height': float(bbox[3] - bbox[1]) if len(bbox) > 3 else 0.0,
+                        'frame_width': frame.shape[1] if len(frame.shape) > 1 else 0,
+                        'frame_height': frame.shape[0] if len(frame.shape) > 0 else 0,
+                        'session_id': self.session_id,
+                        'tracker_id': tracker_id,
+                        'image_url': image_url,
+                        'detection_metadata': {
+                            'model_threshold': self.camera_config.odthreshold / 100.0,
+                            'detection_classes': self.camera_config.detection_classes,
+                            'recording_active': getattr(self.camera_config, 'recording_active', False),
+                            'tracking_metadata': track_metadata,
+                            'is_first_detection': True,
+                            'image_saved': image_url is not None
+                        }
                     }
-                }
-                
-                new_detections.append(detection_event)
-                
-                # Store in track history
-                self.track_history.append({
-                    'tracker_id': tracker_id,
-                    'class_name': class_name,
-                    'timestamp': current_time.isoformat(),
-                    'status': 'first_detected',
-                    'image_url': image_url
-                })
-                
-                logger.info(
-                    f"New object detected - Camera: {self.camera_config.name}, "
-                    f"Tracker ID: {tracker_id}, Class: {class_name}, "
-                    f"Confidence: {confidence:.2f}, Image: {image_url is not None}"
-                )
+                    
+                    new_detections.append(detection_event)
+                    
+                    # Store in track history
+                    self.track_history.append({
+                        'tracker_id': tracker_id,
+                        'class_name': class_name,
+                        'timestamp': current_time.isoformat(),
+                        'status': 'first_detected',
+                        'image_url': image_url
+                    })
+                    
+                    logger.info(
+                        f"New object detected - Camera: {self.camera_config.name}, "
+                        f"Tracker ID: {tracker_id}, Class: {class_name}, "
+                        f"Confidence: {confidence:.2f}, Image: {image_url is not None}"
+                    )
+                    
+                else:
+                    # EXISTING TRACKER: Update detection (no new image)
+                    detection_update = {
+                        'camera_id': self.camera_config.id,
+                        'tracker_id': tracker_id,
+                        'timestamp': current_time.isoformat(),
+                        'confidence': confidence,
+                        'bbox_x': float(bbox[0]) if len(bbox) > 0 else 0.0,
+                        'bbox_y': float(bbox[1]) if len(bbox) > 1 else 0.0,
+                        'bbox_width': float(bbox[2] - bbox[0]) if len(bbox) > 2 else 0.0,
+                        'bbox_height': float(bbox[3] - bbox[1]) if len(bbox) > 3 else 0.0,
+                        'detection_metadata': {
+                            'tracking_metadata': track_metadata,
+                            'is_first_detection': False,
+                            'last_updated': current_time.isoformat()
+                        }
+                    }
+                    
+                    update_detections.append(detection_update)
+                    
+                    # Store in track history
+                    self.track_history.append({
+                        'tracker_id': tracker_id,
+                        'class_name': class_name,
+                        'timestamp': current_time.isoformat(),
+                        'status': 'updated',
+                        'confidence': confidence
+                    })
+                    
+                    logger.debug(
+                        f"Object updated - Camera: {self.camera_config.name}, "
+                        f"Tracker ID: {tracker_id}, Class: {class_name}, "
+                        f"Confidence: {confidence:.2f}"
+                    )
             
-            # Only add new detections to buffer
+            # Add new detections to buffer (inserts)
             if new_detections:
                 self.analytics_manager.detection_buffer.extend(new_detections)
+            
+            # Add updates to buffer with flag
+            if update_detections:
+                for update in update_detections:
+                    update['_is_update'] = True
+                    self.analytics_manager.detection_buffer.append(update)
             
             # Check if we need to flush
             current_time_unix = time.time()

@@ -3,9 +3,10 @@ import { ICameraProps } from '@/types/CameraType';
 
 interface CameraGridProps {
   cameras: ICameraProps[];
+  stunServers: string[];
 }
 
-export default function CameraGrid({ cameras }: CameraGridProps) {
+export default function CameraGrid({ cameras, stunServers }: CameraGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
       {cameras.map((camera, index) => (
@@ -16,6 +17,7 @@ export default function CameraGrid({ cameras }: CameraGridProps) {
           Url={camera.Url}
           IsRealTimeDetection={camera.IsRealTimeDetection}
           ServerName={camera.SignalingServer}
+          stunServers={stunServers}
         />
       ))}
     </div>

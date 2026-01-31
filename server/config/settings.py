@@ -14,6 +14,10 @@ class Settings:
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-supabase-key")
     SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "vitcam-recordings")
     
+    WEBRTC_STUN_SERVERS = os.getenv("WEBRTC_STUN_SERVERS")
+    WEBRTC_TURN_SERVER = os.getenv("WEBRTC_TURN_SERVER")
+    WEBRTC_TURN_USERNAME = os.getenv("WEBRTC_TURN_USERNAME")
+    WEBRTC_TURN_CREDENTIAL = os.getenv("WEBRTC_TURN_CREDENTIAL")
     # Server Configuration
     WEBSOCKET_HOST = "0.0.0.0"
     WEBSOCKET_PORT = 8765

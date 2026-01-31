@@ -159,6 +159,5 @@ export default function GeneralSettings() {
 
       <NotificationDialog notification={notification} onClose={hideNotification} />
     </div>
-  ) : 
-  router.push('/signin');
+  ) :""
 }

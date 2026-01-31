@@ -19,6 +19,16 @@ const nextConfig: NextConfig = {
         port: '54321',
         pathname: '/storage/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+        pathname: '/**',
+      },
     ],
   },
   output: 'standalone', // Keep this if using Docker
