@@ -300,7 +300,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
   // Auth check
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen  dark:bg-gray-900 flex items-center justify-center">
         <Loader className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
@@ -311,7 +311,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900] ${className}`}>
+    <div className={`min-h-screen dark:bg-gray-900] ${className}`}>
       <div className="container mx-auto px-4 py-6 bg-white dark:bg-[#1a2332]">
         {/* Header with Title and Refresh */}
         <div className="mb-6 flex items-center gap-4">
