@@ -311,7 +311,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-[#1a2332] ${className}`}>
+    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900] ${className}`}>
       <div className="container mx-auto px-4 py-6 bg-white dark:bg-[#1a2332]">
         {/* Header with Title and Refresh */}
         <div className="mb-6 flex items-center gap-4">
@@ -482,7 +482,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
                 {videos.map((video) => (
                   <div
                     key={video.id}
-                    className="bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group"
+                    className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100  rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group"
                   >
                     {/* Thumbnail with Video Element */}
                     <div className="relative aspect-video bg-gray-700">
@@ -529,18 +529,18 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
 
                     {/* Info Section */}
                     <div className="p-4">
-                      <h3 className="text-sm font-medium text-white truncate mb-2" title={video.name}>
+                      <h3 className="text-sm text-gray-700 dark:text-gray-300 truncate mb-2" title={video.name}>
                         {video.name}
                       </h3>
                       
-                      <div className="space-y-1 text-xs text-gray-400 mb-4">
+                      <div className="space-y-1 mb-4 text-sm text-gray-700 dark:text-gray-300 truncate">
                         <div className="flex items-center gap-2">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
                           {video.camera}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
