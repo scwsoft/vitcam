@@ -20,6 +20,12 @@ const nextConfig: NextConfig = {
         pathname: '/storage/**',
       },
       {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '54321',
+        pathname: '/storage/**',
+      },
+      {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
         pathname: '/**',
