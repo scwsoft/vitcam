@@ -316,6 +316,12 @@ enabled = true
 client_id="Q2RlbkM0SGVZMC1OZ3BHQUpHdE46MTpjaQ"
 secret="jzMnV6mLNId7ODrqaIkLPVKWvlt4VjxGkNVPO2Lql6EO0jOygf"
 
+
+[auth.external.discord]
+enabled = true
+client_id="1467555835319419077"
+secret="CC7etT1TraOt7YpasZYcsoQSeeq1aQ0y"
+
 [auth.external.apple]
 enabled = false
 client_id = ""

@@ -5,8 +5,7 @@ import React, { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { usePathname } from "next/navigation";
-import { createClient } from '@/utils/supabase/client'; // Changed to client-side
-
+import { createClient } from '@/utils/supabase/client';
 
 interface UserProfile {
   id: string;
@@ -20,14 +19,13 @@ export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [avatarSrc, setAvatarSrc] = useState<string>('/images/avatar.png');
   const baseUrl = usePathname();
-  const supabase = createClient();
-  
-
 
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
+      const supabase = createClient();
       
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -38,22 +36,41 @@ export default function UserDropdown() {
         return;
       }
 
-      // Fetch profile data
+      // Get avatar from user metadata (OAuth providers store it here)
+      const avatarUrl = user.user_metadata?.avatar_url || 
+                       user.user_metadata?.picture ||
+                       user.user_metadata?.avatar ||
+                       '/images/avatar.png';
+
+      console.log('User metadata:', user.user_metadata); // Debug log
+      console.log('Avatar URL:', avatarUrl); // Debug log
+
+      setAvatarSrc(avatarUrl);
+
+      // Fetch profile data for additional info
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, full_name, username, avatar_url')
         .eq('id', user.id)
         .single();
 
-      
+      if (profileError) {
+        console.log('Error fetching profile:', profileError);
+      }
 
-      // Set user profile with fallback values
+      // Set user profile - prioritize user metadata for name and avatar
       setUserProfile({
         id: user.id,
         email: user.email || 'No email',
-        full_name: profile?.full_name || null,
-        username: profile?.username || null,
-        avatar_url: profile?.avatar_url || null
+        full_name: user.user_metadata?.full_name || 
+                  user.user_metadata?.name || 
+                  profile?.full_name || 
+                  null,
+        username: user.user_metadata?.username || 
+                 user.user_metadata?.user_name ||
+                 profile?.username || 
+                 null,
+        avatar_url: avatarUrl
       });
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -80,19 +97,32 @@ export default function UserDropdown() {
       return userProfile.username;
     }
     if (userProfile?.email) {
-      return userProfile.email.split('@')[0]; // Use email username as fallback
+      return userProfile.email.split('@')[0];
     }
     return 'User';
   };
 
-  // Avatar image logic
-  const getAvatarSrc = () => {
-    return userProfile?.avatar_url || '/images/avatar.png';
+  // Handle image load error
+  const handleImageError = () => {
+    console.error('Avatar image failed to load, using fallback');
+    setAvatarSrc('/images/user/no-avatar.png');
   };
 
   useEffect(() => {
     fetchUserProfile();
-  }, [supabase]);
+    
+    // Set up auth state listener for real-time updates
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        fetchUserProfile();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []); // Empty dependency array
 
   if (loading) {
     return (
@@ -116,7 +146,7 @@ export default function UserDropdown() {
             <Image
               width={100}
               height={100}
-              src={getAvatarSrc()}
+              src="/images/avatar.png"
               alt="User"
             />
           </span>
@@ -132,17 +162,15 @@ export default function UserDropdown() {
         onClick={toggleDropdown} 
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
-        <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
+        <span className="mr-3 overflow-hidden rounded-full h-11 w-11 bg-gray-100 dark:bg-gray-800">
           <Image
             width={100}
             height={100}
-            src={getAvatarSrc()}
+            src={avatarSrc}
             alt="User Avatar"
             className="object-cover w-full h-full"
-            onError={(e) => {
-              // Fallback to default avatar if image fails to load
-              e.currentTarget.src = '/images/user/no-avatar.png';
-            }}
+            onError={handleImageError}
+            unoptimized // Bypass Next.js image optimization for external URLs
           />
         </span>
 
