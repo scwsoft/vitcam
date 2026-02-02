@@ -167,7 +167,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             detections = self.model.predict(converted_image, threshold=self.confidence_threshold)
         
             # Filter by detection classes
-            if len(self.detection_classes) > 1:
+            if len(self.detection_classes) >= 1:
                 detections = detections[np.isin(detections.class_id, list(self.detection_classes))]
                 detections = detections[detections.confidence > 0.45]
                 detections = detections.with_nms(threshold=0.5)
