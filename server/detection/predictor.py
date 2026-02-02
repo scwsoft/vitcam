@@ -133,7 +133,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             from supervision import ByteTrack
             self.tracker = ByteTrack(
                 track_activation_threshold=0.25,
-                lost_track_buffer=30,
+                lost_track_buffer=50,
                 minimum_matching_threshold=0.8,
                 frame_rate=camera_config.fps
             )
@@ -169,6 +169,8 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             # Filter by detection classes
             if len(self.detection_classes) > 1:
                 detections = detections[np.isin(detections.class_id, list(self.detection_classes))]
+                detections = detections[detections.confidence > 0.45]
+                detections = detections.with_nms(threshold=0.5)
             
             # Apply tracking to detections if tracker available
             if self.tracker:
