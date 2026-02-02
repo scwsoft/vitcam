@@ -181,6 +181,10 @@ class CameraTypeDetector:
         
         url_lower = url.lower()
         
+        # Check for YouTube URLs
+        if CameraTypeDetector.is_youtube_url(url):
+            return "youtube"
+        
         # Check for RTSP/RTMP
         if url_lower.startswith('rtsp://') or url_lower.startswith('rtmp://'):
             return "rtsp"
@@ -204,6 +208,33 @@ class CameraTypeDetector:
         return "rtsp"
     
     @staticmethod
+    def is_youtube_url(url: str) -> bool:
+        """
+        Check if URL is a YouTube URL
+        Supports various YouTube URL formats:
+        - https://www.youtube.com/watch?v=VIDEO_ID
+        - https://youtu.be/VIDEO_ID
+        - https://youtube.com/watch?v=VIDEO_ID
+        - https://m.youtube.com/watch?v=VIDEO_ID
+        - https://www.youtube.com/embed/VIDEO_ID
+        - https://www.youtube.com/v/VIDEO_ID
+        """
+        if not url:
+            return False
+        
+        url_lower = url.lower()
+        youtube_patterns = [
+            'youtube.com/watch',
+            'youtube.com/embed',
+            'youtube.com/v/',
+            'youtu.be/',
+            'm.youtube.com',
+            'www.youtube.com'
+        ]
+        
+        return any(pattern in url_lower for pattern in youtube_patterns)
+    
+    @staticmethod
     def parse_camera_source(url: str) -> Union[int, str]:
         """
         Parse camera source from URL:
@@ -213,6 +244,10 @@ class CameraTypeDetector:
         - "/dev/video0" → "/dev/video0"
         - "rtsp://..." → "rtsp://..."
         """
+        # Check for YouTube URLs - return as-is
+        if CameraTypeDetector.is_youtube_url(url):
+            return url
+        
         if not url:
             return url
         
@@ -357,6 +392,8 @@ class EnhancedCustomVideoStreamTrack(VideoStreamTrack):
             # Configure based on camera type
             if self.camera_type == "local":
                 self._configure_local_camera(fourcc)
+            elif self.camera_type == "youtube":
+                self._configure_youtube_camera(fourcc)
             else:
                 self._configure_rtsp_camera(fourcc)
             
@@ -478,6 +515,66 @@ class EnhancedCustomVideoStreamTrack(VideoStreamTrack):
             # Start recording if configured
             if self.camera_config.is_continuous_recording:
                 self._start_recording("continuous")
+    
+    def _configure_youtube_camera(self, fourcc):
+        """Configure YouTube camera"""
+        logger.info(f"Configuring YouTube stream: {self.camera_config.url}")
+        
+        # YouTube-specific configuration
+        options = {
+            "STREAM_RESOLUTION": f"{self.target_resolution[1]}p",  # e.g., "720p", "1080p"
+            "STREAM_PARAMS": {
+                "nocheckcertificate": True,
+                "format": "best",  # Get best quality available
+            }
+        }
+        
+        if self.logging_manager:
+            asyncio.create_task(self.logging_manager.log_info(
+                f"Initializing YouTube stream with resolution: {self.target_resolution[1]}p",
+                category=LogCategory.CAMERA,
+                subcategory=LogSubcategory.CAMERA_CONNECTION,
+                context=LogContext(
+                    camera_id=self.camera_config.id,
+                    camera_name=self.camera_config.name,
+                    camera_url=self.camera_config.url
+                )
+            ))
+        
+        # Initialize CamGear with YouTube URL
+        # CamGear will automatically use yt-dlp to extract stream URL
+        self.cap = CamGear(
+            source=self.camera_config.url,
+            stream_mode=True,  # Enable YouTube stream mode
+            logging=True,
+            **options
+        )
+        self.cap.start()
+        
+        frame = self.cap.read()
+        if frame is None:
+            self.connection_status.mark_failed()
+            if self.cap:
+                self.cap.stop()
+                self.cap = None
+            raise Exception("No frame received from YouTube stream")
+        
+        self.connection_status.reset()
+        
+        if self.logging_manager:
+            asyncio.create_task(self.logging_manager.log_camera_status(
+                camera_config=self.camera_config,
+                status='CONNECTED',
+                fps_target=self.target_fps,
+                resolution_actual=f"{frame.shape[1]}x{frame.shape[0]}",
+                resolution_target=f"{self.target_resolution[0]}x{self.target_resolution[1]}",
+                codec_used=self.camera_config.normalized_encoder,
+                container_format='webm',
+                bitrate_kbps=self.max_bitrate // 1000
+            ))
+        
+        if self.camera_config.is_continuous_recording:
+            self._start_recording("continuous")
     
     def _configure_rtsp_camera(self, fourcc):
         """Configure RTSP camera (existing implementation)"""
@@ -1456,4 +1553,3 @@ class CustomVideoStreamTrack(VideoStreamTrack):
                 pass
             finally:
                 self.cap = None
-

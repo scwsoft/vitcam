@@ -35,7 +35,7 @@ export default function BasicInputs() {
 
   const validateURL = (value: string) =>
   {
-    const isValidURL = /^(rtsp|rtmp|https|http):\/\/(([^:@]+)(:[^:@]*)?@)?([^:/?#]+)(:\d+)?(\/[^\s?#]*)?/i.test(value);
+    const isValidURL = /^(rtsp|rtmp|https|http):\/\/(([^:@]+)(:[^:@]*)?@)?([^:/?#]+)(:\d+)?(\/[^\s?#]*)?(\?[^\s#]*)?(#[^\s]*)?/i.test(value);
     setErrorURL(!isValidURL);
     return isValidURL;
 
