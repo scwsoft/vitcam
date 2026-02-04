@@ -57,7 +57,7 @@ const CameraGrid: React.FC<CameraGridProps> = ({ cameraStats }) => {
               </div>
 
               {/* Camera name */}
-              <h3 className="text-gray-900 font-semibold text-lg mb-4 truncate">
+              <h3 className="text-gray-900 dark:text-white font-semibold text-lg mb-4 truncate">
                 {camera.camera_name}
               </h3>
 
