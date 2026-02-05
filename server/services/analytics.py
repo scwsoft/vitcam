@@ -66,7 +66,7 @@ class ObjectDetectionAnalytics:
                     'bbox_width': float(bbox[2] - bbox[0]) if len(bbox) > 2 else 0.0,
                     'bbox_height': float(bbox[3] - bbox[1]) if len(bbox) > 3 else 0.0,
                     'frame_width': frame_shape[1] if len(frame_shape) > 1 else 0,
-                    'frame_height': frame_shape[0] if len(frame.shape) > 0 else 0,
+                    'frame_height': frame_shape[0] if len(frame_shape) > 0 else 0,
                     'session_id': session_id,
                     'detection_metadata': {
                         'model_threshold': camera_config.odthreshold / 100.0,

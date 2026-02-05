@@ -227,16 +227,18 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         frame: np.ndarray, 
         tracker_id: int, 
         class_name: str,
-        bbox: list
+        bbox: list,
+        background_opacity: float = 0.3 # 0.0 = fully dark, 1.0 = no dimming
     ) -> Optional[str]:
         """
-        Save detection image to Supabase Storage for object_detection_events table
+        Save detection image to Supabase Storage with full frame and dimmed background
         
         Args:
             frame: Original frame
             tracker_id: Tracker ID
             class_name: Object class name
             bbox: Bounding box coordinates [x1, y1, x2, y2]
+            background_opacity: Background visibility (0.0-1.0, default 0.3)
             
         Returns:
             Image URL or None if failed
@@ -259,19 +261,16 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
             filename = f"{self.camera_config.name}/{timestamp}_tracker{tracker_id}_{class_name}.jpg"
             
-            # Option 1: Save full frame with annotation
-            image_to_save = frame.copy()
+            # Prepare the image with highlighted detection
+            image_to_save = self._prepare_detection_image(
+                frame=frame,
+                bbox=bbox,
+                background_opacity=background_opacity
+            )
             
-            # Option 2: Save cropped region (uncomment to use)
-            # x1, y1, x2, y2 = map(int, bbox)
-            # # Add padding
-            # padding = 20
-            # h, w = frame.shape[:2]
-            # x1 = max(0, x1 - padding)
-            # y1 = max(0, y1 - padding)
-            # x2 = min(w, x2 + padding)
-            # y2 = min(h, y2 + padding)
-            # image_to_save = frame[y1:y2, x1:x2]
+            if image_to_save is None:
+                logger.error("Failed to prepare detection image")
+                return None
             
             # Handle color space conversion based on input format
             # OpenCV's imencode expects BGR format
@@ -315,7 +314,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     file_options={"content-type": "image/jpeg"}
                 )
                 
-               # The response object varies by version, just check if upload succeeded
+                # The response object varies by version, just check if upload succeeded
                 # If no exception was raised, upload was successful
                 logger.debug(f"Upload response: {response}")
                 
@@ -339,7 +338,71 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         except Exception as e:
             logger.error(f"Error saving detection image: {e}")
             return None
-    
+
+    def _prepare_detection_image(
+        self,
+        frame: np.ndarray,
+        bbox: list,
+        background_opacity: float = 0.3
+    ) -> Optional[np.ndarray]:
+        """
+        Prepare full-size detection image with dimmed background highlighting the detected object
+        
+        Args:
+            frame: Original frame (full size preserved)
+            bbox: Bounding box coordinates [x1, y1, x2, y2]
+            background_opacity: Background visibility (0.0-1.0)
+                               0.0 = fully dark/black background
+                               0.3 = heavily dimmed (default, recommended)
+                               0.5 = moderately dimmed
+                               0.7 = lightly dimmed
+                               1.0 = no dimming (original brightness)
+            
+        Returns:
+            Full-size processed image with highlighted detection or None if failed
+        """
+        try:
+            # Clamp opacity to valid range
+            background_opacity = max(0.0, min(1.0, background_opacity))
+            
+            # Copy frame to avoid modifying original
+            output_frame = frame.copy()
+            
+            # Get frame dimensions
+            h, w = frame.shape[:2]
+            
+            # Parse and validate bounding box coordinates
+            x1, y1, x2, y2 = map(int, bbox)
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(w, x2)
+            y2 = min(h, y2)
+            
+            # Validate bbox
+            if x2 <= x1 or y2 <= y1:
+                logger.error(f"Invalid bounding box: {bbox}")
+                return None
+            
+            # Create mask for the bounding box region
+            mask = np.zeros((h, w), dtype=np.uint8)
+            mask[y1:y2, x1:x2] = 255
+            
+            # Apply dimming to background
+            # Reduce brightness of background by multiplying with opacity value
+            dimmed_frame = (output_frame * background_opacity).astype(np.uint8)
+            
+            # Blend: keep original inside bbox, dimmed outside
+            # Convert mask to 3-channel for blending
+            mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) / 255.0
+            output_frame = (output_frame * mask_3channel + 
+                           dimmed_frame * (1 - mask_3channel)).astype(np.uint8)
+            
+            return output_frame
+            
+        except Exception as e:
+            logger.error(f"Error preparing detection image: {e}")
+            return None
+            
     async def _log_tracked_detections(self, detections, frame: np.ndarray):
         """
         Log detection events with tracker IDs to analytics.
@@ -404,11 +467,11 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                                 scene=annotated_frame, 
                                 detections=single_detection
                             )
-                            annotated_frame = self.label_annotator.annotate(
-                                scene=annotated_frame, 
-                                detections=single_detection, 
-                                labels=[label]
-                            )
+                            # annotated_frame = self.label_annotator.annotate(
+                            #     scene=annotated_frame, 
+                            #     detections=single_detection, 
+                            #     labels=[label]
+                            # )
                             
                             image_url = await self._save_detection_image(
                                 frame=annotated_frame,
