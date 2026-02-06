@@ -93,7 +93,7 @@ class CameraPredictor:
 
 
 class CameraPredictorWithAnalytics(CameraPredictor):
-    """Enhanced camera predictor with analytics tracking and object tracking"""
+    """Enhanced camera predictor with analytics tracking and object tracking using DeepSORT"""
     
     def __init__(
         self, 
@@ -128,18 +128,54 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         self.storage_bucket = storage_bucket
         self.frame_color_format = frame_color_format.upper()  # Store as uppercase
         
-        # Initialize ByteTrack for object tracking
+        # Initialize DeepSORT for object tracking using deep-sort-realtime
         try:
-            from supervision import ByteTrack
-            self.tracker = ByteTrack(
-                track_activation_threshold=0.25,
-                lost_track_buffer=50,
-                minimum_matching_threshold=0.8,
-                frame_rate=camera_config.fps
+            from deep_sort_realtime.deepsort_tracker import DeepSort
+            
+            # Initialize DeepSORT with optimized parameters
+            self.tracker = DeepSort(
+                max_age=50,              # Frames to keep lost tracks
+                n_init=3,                # Frames to confirm a track
+                nms_max_overlap=0.7,     # NMS overlap threshold
+                max_cosine_distance=0.3, # Appearance similarity threshold
+                nn_budget=100,           # Max samples per class
+                # embedder can be "mobilenet" (default, faster) or "torchreid" (more accurate)
+                embedder="mobilenet",
+                half=True,               # Use FP16 for faster inference
+                bgr=True,                # Input frames are in BGR format
+                embedder_gpu=True,       # Use GPU for embedder if available
+                embedder_model_name=None,
+                embedder_wts=None,
+                polygon=False,
+                today=None
             )
-        except ImportError:
+            logger.info(f"DeepSORT tracker initialized for camera: {camera_config.name} (using deep-sort-realtime)")
+            self.tracker_type = "DeepSORT"
+            
+        except ImportError as e:
+            logger.error(f"DeepSORT (deep-sort-realtime) not available: {e}")
+            logger.info("Install with: pip install deep-sort-realtime")
+            
+            # Fallback to ByteTrack if DeepSORT not available
+            try:
+                logger.warning("Falling back to ByteTrack")
+                from supervision import ByteTrack
+                self.tracker = ByteTrack(
+                    track_activation_threshold=0.25,
+                    lost_track_buffer=50,
+                    minimum_matching_threshold=0.8,
+                    frame_rate=camera_config.fps
+                )
+                logger.info(f"ByteTrack tracker initialized (fallback) for camera: {camera_config.name}")
+                self.tracker_type = "ByteTrack"
+            except Exception as fallback_error:
+                self.tracker = None
+                self.tracker_type = "None"
+                logger.warning(f"Object tracking not available for camera {camera_config.name}: {fallback_error}")
+        except Exception as e:
             self.tracker = None
-            logger.warning("ByteTrack not available, tracking disabled")
+            self.tracker_type = "None"
+            logger.warning(f"Object tracking not available for camera {camera_config.name}: {e}")
         
         # Track statistics
         self.tracked_objects = {}
@@ -173,7 +209,93 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 detections = detections.with_nms(threshold=0.5)
             
             # Apply tracking to detections if tracker available
-            if self.tracker:
+            if self.tracker and self.tracker_type == "DeepSORT" and len(detections) > 0:
+                # Convert detections to format expected by deep-sort-realtime
+                # Format: [[x1, y1, x2, y2, confidence, class_id], ...]
+                raw_detections = []
+                for i in range(len(detections.xyxy)):
+                    bbox = detections.xyxy[i]
+                    confidence = float(detections.confidence[i])
+                    class_id = int(detections.class_id[i])
+                    
+                    # DeepSort expects: [left, top, width, height, confidence]
+                    # We have: [x1, y1, x2, y2, confidence, class_id]
+                    x1, y1, x2, y2 = map(float, bbox)
+                    width = x2 - x1
+                    height = y2 - y1
+                    
+                    raw_detections.append(([x1, y1, width, height], confidence, class_id))
+                
+                # Update tracker with current frame and detections
+                tracks = self.tracker.update_tracks(raw_detections, frame=frame)
+                
+                # Convert tracked results back to supervision format
+                if len(tracks) > 0:
+                    tracked_boxes = []
+                    tracked_confidences = []
+                    tracked_class_ids = []
+                    tracker_ids = []
+                    
+                    for track in tracks:
+                        if not track.is_confirmed():
+                            continue
+                        
+                        # Get bounding box in [x1, y1, x2, y2] format
+                        ltrb = track.to_ltrb()
+                        tracked_boxes.append(ltrb)
+                        
+                        # Get track metadata - ensure proper types
+                        tracker_ids.append(int(track.track_id))
+                        
+                        # Get confidence, default to 0.0 if not available
+                        try:
+                            conf = track.get_det_conf() if hasattr(track, 'get_det_conf') else None
+                            tracked_confidences.append(float(conf) if conf is not None else 0.5)
+                        except:
+                            tracked_confidences.append(0.5)
+                        
+                        # Get class ID, default to 0 if not available
+                        try:
+                            cls = track.get_det_class() if hasattr(track, 'get_det_class') else None
+                            tracked_class_ids.append(int(cls) if cls is not None else 0)
+                        except:
+                            tracked_class_ids.append(0)
+                    
+                    if len(tracked_boxes) > 0:
+                        # Create new Detections object with tracker IDs
+                        # Ensure all arrays are properly typed and have no None values
+                        tracked_boxes_clean = []
+                        tracked_confidences_clean = []
+                        tracked_class_ids_clean = []
+                        tracker_ids_clean = []
+                        
+                        for idx in range(len(tracked_boxes)):
+                            # Validate all values
+                            if (tracked_boxes[idx] is not None and 
+                                tracked_confidences[idx] is not None and 
+                                tracked_class_ids[idx] is not None and 
+                                tracker_ids[idx] is not None):
+                                tracked_boxes_clean.append(tracked_boxes[idx])
+                                tracked_confidences_clean.append(tracked_confidences[idx])
+                                tracked_class_ids_clean.append(tracked_class_ids[idx])
+                                tracker_ids_clean.append(tracker_ids[idx])
+                        
+                        if len(tracked_boxes_clean) > 0:
+                            detections = sv.Detections(
+                                xyxy=np.array(tracked_boxes_clean, dtype=np.float32),
+                                confidence=np.array(tracked_confidences_clean, dtype=np.float32),
+                                class_id=np.array(tracked_class_ids_clean, dtype=np.int32),
+                                tracker_id=np.array(tracker_ids_clean, dtype=np.int32)
+                            )
+                        else:
+                            # No valid tracks after cleaning, keep original detections
+                            logger.warning(f"No valid tracks after cleaning for camera {self.camera_config.name}")
+                    else:
+                        # No confirmed tracks, keep original detections without tracker IDs
+                        pass
+            
+            elif self.tracker and self.tracker_type == "ByteTrack" and len(detections) > 0:
+                # Use supervision's ByteTrack API
                 detections = self.tracker.update_with_detections(detections)
             
             # Prepare labels with tracker IDs
@@ -181,12 +303,37 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             for i, (class_id, confidence) in enumerate(
                 zip(detections.class_id, detections.confidence)
             ):
+                # Convert to native Python types with null safety
+                try:
+                    if class_id is None:
+                        class_id = 0
+                    else:
+                        class_id = int(class_id)
+                except (TypeError, ValueError):
+                    class_id = 0
+                
+                try:
+                    if confidence is None:
+                        confidence = 0.5
+                    else:
+                        confidence = float(confidence)
+                except (TypeError, ValueError):
+                    confidence = 0.5
+                
                 # Get class name with bounds checking
-                class_name = COCO_CLASSES[class_id]
+                if class_id >= len(COCO_CLASSES) or class_id < 0:
+                    class_name = f"class_{class_id}"
+                else:
+                    class_name = COCO_CLASSES[class_id]
                 
                 # Add tracker ID if available
-                if self.tracker and hasattr(detections, 'tracker_id') and len(detections.tracker_id) > i:
-                    tracker_id = detections.tracker_id[i]
+                if self.tracker and hasattr(detections, 'tracker_id') and detections.tracker_id is not None and len(detections.tracker_id) > i:
+                    try:
+                        tracker_id = int(detections.tracker_id[i])
+                    except (TypeError, ValueError):
+                        # No valid tracker ID, skip tracking for this detection
+                        labels.append(f"{class_name} {confidence:.2f}")
+                        continue
                     
                     # Update tracked objects dictionary
                     if tracker_id not in self.tracked_objects:
@@ -219,7 +366,9 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             return annotated_frame
             
         except Exception as e:
-            logger.error(f"Error in tracked prediction: {e}")
+            import traceback
+            logger.error(f"Error in tracked prediction for camera {self.camera_config.name}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return frame
     
     async def _save_detection_image(
@@ -227,18 +376,16 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         frame: np.ndarray, 
         tracker_id: int, 
         class_name: str,
-        bbox: list,
-        background_opacity: float = 0.3 # 0.0 = fully dark, 1.0 = no dimming
+        bbox: list
     ) -> Optional[str]:
         """
-        Save detection image to Supabase Storage with full frame and dimmed background
+        Save detection image to Supabase Storage with full frame
         
         Args:
-            frame: Original frame
+            frame: Annotated frame with bounding box already drawn
             tracker_id: Tracker ID
             class_name: Object class name
-            bbox: Bounding box coordinates [x1, y1, x2, y2]
-            background_opacity: Background visibility (0.0-1.0, default 0.3)
+            bbox: Bounding box coordinates [x1, y1, x2, y2] (not used, kept for compatibility)
             
         Returns:
             Image URL or None if failed
@@ -261,16 +408,8 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
             filename = f"{self.camera_config.name}/{timestamp}_tracker{tracker_id}_{class_name}.jpg"
             
-            # Prepare the image with highlighted detection
-            image_to_save = self._prepare_detection_image(
-                frame=frame,
-                bbox=bbox,
-                background_opacity=background_opacity
-            )
-            
-            if image_to_save is None:
-                logger.error("Failed to prepare detection image")
-                return None
+            # Use the frame as-is (already has bounding box annotated)
+            image_to_save = frame
             
             # Handle color space conversion based on input format
             # OpenCV's imencode expects BGR format
@@ -338,70 +477,6 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         except Exception as e:
             logger.error(f"Error saving detection image: {e}")
             return None
-
-    def _prepare_detection_image(
-        self,
-        frame: np.ndarray,
-        bbox: list,
-        background_opacity: float = 0.3
-    ) -> Optional[np.ndarray]:
-        """
-        Prepare full-size detection image with dimmed background highlighting the detected object
-        
-        Args:
-            frame: Original frame (full size preserved)
-            bbox: Bounding box coordinates [x1, y1, x2, y2]
-            background_opacity: Background visibility (0.0-1.0)
-                               0.0 = fully dark/black background
-                               0.3 = heavily dimmed (default, recommended)
-                               0.5 = moderately dimmed
-                               0.7 = lightly dimmed
-                               1.0 = no dimming (original brightness)
-            
-        Returns:
-            Full-size processed image with highlighted detection or None if failed
-        """
-        try:
-            # Clamp opacity to valid range
-            background_opacity = max(0.0, min(1.0, background_opacity))
-            
-            # Copy frame to avoid modifying original
-            output_frame = frame.copy()
-            
-            # Get frame dimensions
-            h, w = frame.shape[:2]
-            
-            # Parse and validate bounding box coordinates
-            x1, y1, x2, y2 = map(int, bbox)
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(w, x2)
-            y2 = min(h, y2)
-            
-            # Validate bbox
-            if x2 <= x1 or y2 <= y1:
-                logger.error(f"Invalid bounding box: {bbox}")
-                return None
-            
-            # Create mask for the bounding box region
-            mask = np.zeros((h, w), dtype=np.uint8)
-            mask[y1:y2, x1:x2] = 255
-            
-            # Apply dimming to background
-            # Reduce brightness of background by multiplying with opacity value
-            dimmed_frame = (output_frame * background_opacity).astype(np.uint8)
-            
-            # Blend: keep original inside bbox, dimmed outside
-            # Convert mask to 3-channel for blending
-            mask_3channel = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) / 255.0
-            output_frame = (output_frame * mask_3channel + 
-                           dimmed_frame * (1 - mask_3channel)).astype(np.uint8)
-            
-            return output_frame
-            
-        except Exception as e:
-            logger.error(f"Error preparing detection image: {e}")
-            return None
             
     async def _log_tracked_detections(self, detections, frame: np.ndarray):
         """
@@ -415,11 +490,33 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             update_detections = []
             
             for i in range(len(detections.class_id) if hasattr(detections, 'class_id') else 0):
-                # Extract detection data
-                bbox = detections.xyxy[i] if hasattr(detections, 'xyxy') and len(detections.xyxy) > i else [0, 0, 0, 0]
-                class_id = int(detections.class_id[i]) if hasattr(detections, 'class_id') and len(detections.class_id) > i else 0
-                confidence = float(detections.confidence[i]) if hasattr(detections, 'confidence') and len(detections.confidence) > i else 0.0
-                tracker_id = int(detections.tracker_id[i]) if hasattr(detections, 'tracker_id') and len(detections.tracker_id) > i else None
+                # Extract detection data with comprehensive null safety
+                try:
+                    bbox = detections.xyxy[i] if hasattr(detections, 'xyxy') and len(detections.xyxy) > i else [0, 0, 0, 0]
+                except Exception as e:
+                    logger.warning(f"Error extracting bbox for detection {i}: {e}")
+                    bbox = [0, 0, 0, 0]
+                
+                try:
+                    class_id_raw = detections.class_id[i] if hasattr(detections, 'class_id') and len(detections.class_id) > i else 0
+                    class_id = int(class_id_raw) if class_id_raw is not None else 0
+                except Exception as e:
+                    logger.warning(f"Error extracting class_id for detection {i}: {e}")
+                    class_id = 0
+                
+                try:
+                    confidence_raw = detections.confidence[i] if hasattr(detections, 'confidence') and len(detections.confidence) > i else 0.5
+                    confidence = float(confidence_raw) if confidence_raw is not None else 0.5
+                except Exception as e:
+                    logger.warning(f"Error extracting confidence for detection {i}: {e}")
+                    confidence = 0.5
+                
+                try:
+                    tracker_id_raw = detections.tracker_id[i] if hasattr(detections, 'tracker_id') and detections.tracker_id is not None and len(detections.tracker_id) > i else None
+                    tracker_id = int(tracker_id_raw) if tracker_id_raw is not None else None
+                except Exception as e:
+                    logger.warning(f"Error extracting tracker_id for detection {i}: {e}")
+                    tracker_id = None
                 
                 # Skip if no tracker ID
                 if tracker_id is None:
@@ -429,7 +526,11 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 is_new_tracker = tracker_id not in self.logged_tracker_ids
                 
                 # Get class name with bounds checking
-                class_name = COCO_CLASSES[class_id]
+                if class_id >= len(COCO_CLASSES) or class_id < 0:
+                    class_name = f"class_{class_id}"
+                    logger.warning(f"Class ID {class_id} out of bounds, using generic name")
+                else:
+                    class_name = COCO_CLASSES[class_id]
                 
                 # Get tracking metadata
                 track_metadata = {}
@@ -462,7 +563,9 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                             )
                             
                             # Annotate with bounding box and label
-                            label = f"{class_name} {confidence:.2f}"
+                            # Ensure confidence is valid for formatting
+                            safe_confidence = confidence if confidence is not None else 0.5
+                            label = f"{class_name} {safe_confidence:.2f}"
                             annotated_frame = self.box_annotator.annotate(
                                 scene=annotated_frame, 
                                 detections=single_detection
@@ -477,7 +580,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                                 frame=annotated_frame,
                                 tracker_id=tracker_id,
                                 class_name=class_name,
-                                bbox=bbox
+                                bbox=bbox  # Kept for compatibility, not used internally
                             )
                             
                         except Exception as img_error:
@@ -589,6 +692,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     def get_tracking_statistics(self) -> Dict[str, Any]:
         """Get statistics about tracked objects"""
         return {
+            'tracker_type': self.tracker_type,
             'total_tracked_objects': len(self.tracked_objects),
             'total_logged_objects': len(self.logged_tracker_ids),
             'active_tracks': len([t for t in self.tracked_objects.values() 
@@ -601,7 +705,22 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     def reset_tracker(self):
         """Reset the tracker and clear tracked objects"""
         if self.tracker:
-            self.tracker.reset()
+            if self.tracker_type == "DeepSORT":
+                # DeepSort (deep-sort-realtime) uses delete_all_tracks()
+                try:
+                    if hasattr(self.tracker, 'delete_all_tracks'):
+                        self.tracker.delete_all_tracks()
+                    else:
+                        logger.warning("DeepSort tracker doesn't have delete_all_tracks method")
+                except Exception as e:
+                    logger.error(f"Error resetting DeepSort tracker: {e}")
+            elif self.tracker_type == "ByteTrack":
+                # ByteTrack uses reset()
+                try:
+                    self.tracker.reset()
+                except Exception as e:
+                    logger.error(f"Error resetting ByteTrack tracker: {e}")
+        
         self.tracked_objects.clear()
         self.track_history.clear()
         self.logged_tracker_ids.clear()
