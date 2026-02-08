@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./docs/images/Logo.png" width="70" height="70" /><img src="./docs/images/ViTCam.png" width="160" height="70" />
+<img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
 
 **🔒 Your Cameras. Your Data. Your Control. 🔒**
 
