@@ -1,7 +1,8 @@
+# ViTCam
 
 <div align="center">
 
-<img src="./docs/images/Logo.png" width="100" height="100" /><img src="./docs/images/ViTCam.png" width="190" height="100" />
+<img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
 
 **🔒 Your Cameras. Your Data. Your Control. 🔒**
 
@@ -666,3 +667,5 @@ Your cameras. Your data. Your control. Forever.
 *VitCam: Because your security footage shouldn't be someone else's data*
 
 </div>
+ash
+git clone https://github.com/your-username/project-name.git
