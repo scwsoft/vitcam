@@ -1,8 +1,7 @@
-# ViTCam
 
 <div align="center">
 
-<img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
+<img src="./docs/images/Logo.png" width="100" height="100" /><img src="./docs/images/ViTCam.png" width="190" height="100" />
 
 **🔒 Your Cameras. Your Data. Your Control. 🔒**
 
