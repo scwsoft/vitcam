@@ -43,6 +43,6 @@ export interface CameraFormErrors {
   rectype?: string
 }
 
-export type CameraType = 'RTSP' | 'HTTP' | 'RTMP' | 'WebRTC'
-export type RecordingType = 'continuous' | 'motion' | 'scheduled' | 'manual'
+export type CameraType = 'RTSP' | 'HTTP' | 'Youtube Live' 
+export type RecordingType = 'continuous' | 'motion' | 'none' 
 export type EncoderType = 'h264' | 'h265' | 'mjpeg' | 'vp8' | 'vp9'

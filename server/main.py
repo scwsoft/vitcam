@@ -253,8 +253,7 @@ async def handle_websocket(websocket):
                                 
                                 if not any(video_sender.track == active_tracks[key] for video_sender in video_senders):
                                   peer_connection.addTrack(active_tracks[key])
-
-                                #   force_codec(peer_connection, video_sender, 'video/VP9')
+                                  force_codec(peer_connection, active_tracks[key], 'video/VP9')
                         
                         except Exception as e:
                             logger.error(f"Error setting up video track: {e}")

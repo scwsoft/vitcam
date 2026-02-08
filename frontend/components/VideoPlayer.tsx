@@ -657,7 +657,7 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
               'bg-red-500'
             }`}></div>
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {isRemoteStream ? 'Live' : 
+              {isRemoteStream ? 'Online' : 
                (stateConnection === "connecting" || isReset) ? 'Connecting' : 
                'Offline'}
             </span>

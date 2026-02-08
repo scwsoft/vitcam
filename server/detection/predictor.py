@@ -347,9 +347,12 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     self.tracked_objects[tracker_id]['frame_count'] += 1
                     self.tracked_objects[tracker_id]['last_seen'] = time.time()
 
-                    labels.append(f"{class_name} {confidence:.2f}")
+                    #labels.append(f"{class_name} {confidence:.2f}")
+                    labels.append(f"{class_name}")
+
                 else:
-                    labels.append(f"{class_name} {confidence:.2f}")
+                    #labels.append(f"{class_name} {confidence:.2f}")
+                    labels.append(f"{class_name}")
 
             
             annotated_frame = frame.copy()
@@ -570,11 +573,11 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                                 scene=annotated_frame, 
                                 detections=single_detection
                             )
-                            # annotated_frame = self.label_annotator.annotate(
-                            #     scene=annotated_frame, 
-                            #     detections=single_detection, 
-                            #     labels=[label]
-                            # )
+                            annotated_frame = self.label_annotator.annotate(
+                                scene=annotated_frame, 
+                                detections=single_detection, 
+                                labels=[label]
+                            )
                             
                             image_url = await self._save_detection_image(
                                 frame=annotated_frame,

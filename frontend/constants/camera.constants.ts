@@ -97,13 +97,12 @@ export const INITIAL_FORM_DATA: CameraFormData = {
   rectype: ''
 }
 
-export const CAMERA_TYPES = ['RTSP', 'HTTP', 'RTMP', 'WebRTC'] as const
+export const CAMERA_TYPES = ['RTSP', 'HTTP', 'Youtube Live'] as const
 
 export const RECORDING_TYPES = [
   { value: 'continuous', label: 'Continuous' },
   { value: 'motion', label: 'Motion Detection' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'manual', label: 'Manual' }
+  { value: 'none', label: 'None' },
 ] as const
 
 export const ENCODER_TYPES = [
