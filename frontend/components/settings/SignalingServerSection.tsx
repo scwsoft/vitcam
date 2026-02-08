@@ -132,7 +132,7 @@ export const SignalingServerSection = ({
           <button
             onClick={onConnect}
             disabled={!isFormValid}
-            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex justify-end space-x-3 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Connect
           </button>

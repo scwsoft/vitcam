@@ -162,6 +162,21 @@ class ObjectDetectionAnalytics:
                             logger.warning(f"Skipping update: missing tracker_id or camera_id")
                             continue
                         
+                        # First, SELECT the most recent record for this tracker_id and camera_id
+                        select_result = self.supabase_client.table('object_detection_events')\
+                            .select('id')\
+                            .eq('tracker_id', tracker_id)\
+                            .eq('camera_id', camera_id)\
+                            .order('timestamp', desc=True)\
+                            .limit(1)\
+                            .execute()
+                        
+                        if not hasattr(select_result, 'data') or not select_result.data:
+                            logger.warning(f"No existing record found for tracker_id {tracker_id}")
+                            continue
+                        
+                        record_id = select_result.data[0]['id']
+                        
                         # Prepare update payload (only fields that should be updated)
                         update_payload = {
                             'timestamp': update['timestamp'],
@@ -173,13 +188,10 @@ class ObjectDetectionAnalytics:
                             'detection_metadata': update['detection_metadata']
                         }
                         
-                        # Update the most recent record for this tracker_id and camera_id
+                        # Update the specific record by ID
                         result = self.supabase_client.table('object_detection_events')\
                             .update(update_payload)\
-                            .eq('tracker_id', tracker_id)\
-                            .eq('camera_id', camera_id)\
-                            .order('timestamp', desc=True)\
-                            .limit(1)\
+                            .eq('id', record_id)\
                             .execute()
                         
                         if hasattr(result, 'data') and result.data:

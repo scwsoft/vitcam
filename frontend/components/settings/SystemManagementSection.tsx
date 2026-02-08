@@ -33,7 +33,7 @@ export const SystemManagementSection = ({
           <button
             onClick={onClearLogs}
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex justify-end space-x-3 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Clearing...' : 'Clear All Logs'}
           </button>
@@ -47,7 +47,7 @@ export const SystemManagementSection = ({
           <button
             onClick={onClearRecordings}
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex justify-end space-x-3 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Clearing...' : 'Clear All Recordings'}
           </button>
@@ -61,7 +61,7 @@ export const SystemManagementSection = ({
           <button
             onClick={onClearAnalytics}
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex justify-end space-x-3 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Clearing...' : 'Clear All Analytics'}
           </button>
@@ -75,7 +75,7 @@ export const SystemManagementSection = ({
           <button
             onClick={onClearDetectionImages}
             disabled={isSubmitting}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex justify-end space-x-3 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Clearing...' : 'Clear All Detection Images'}
           </button>
