@@ -136,7 +136,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             self.tracker = DeepSort(
                 max_age=50,              # Frames to keep lost tracks
                 n_init=3,                # Frames to confirm a track
-                nms_max_overlap=0.7,     # NMS overlap threshold
+                nms_max_overlap=0.1,     # NMS overlap threshold
                 max_cosine_distance=0.3, # Appearance similarity threshold
                 nn_budget=100,           # Max samples per class
                 # embedder can be "mobilenet" (default, faster) or "torchreid" (more accurate)
