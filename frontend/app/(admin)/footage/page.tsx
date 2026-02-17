@@ -205,7 +205,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
     return (
       <div className="fixed inset-0  bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-50 p-4">
         <div className="bg-white dark:bg-[#1a2332] rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden shadow-2xl">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+          <div className="p-4 border-2 border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {selectedVideo.name}
@@ -229,7 +229,7 @@ const VideoManagementPage: React.FC<VideoManagementPageProps> = ({
             </button>
           </div>
           
-          <div className="p-4 bg-gray-100 dark:bg-gray-900">
+          <div className="p-4 border-2 bg-gray-100 dark:bg-gray-900">
             <VideoPlayer
               camera={selectedVideo.camera}
               filename={selectedVideo.name}

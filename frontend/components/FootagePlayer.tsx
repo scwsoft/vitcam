@@ -283,7 +283,7 @@ const VideoPlayer: React.FC<ImprovedVideoPlayerProps> = ({
         onError={handleIframeError}
         title={`Video player for ${filename}`}
         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        style={{ aspectRatio: '16/9' }}
+        style={{ aspectRatio: '3/2' }}
       />
 
       {/* Loading overlay - only shows while loading */}

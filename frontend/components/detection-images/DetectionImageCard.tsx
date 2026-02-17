@@ -70,7 +70,7 @@ export function DetectionImageCard({
         </div>
 
         {/* Detection Type Badge */}
-        <div className="absolute top-2 right-2">
+        {/* <div className="absolute top-2 right-2">
           <span
             className={`px-2 py-1 ${getDetectionTypeColor(
               image.detection_type
@@ -78,7 +78,7 @@ export function DetectionImageCard({
           >
             {formatDetectionType(image.detection_type)}
           </span>
-        </div>
+        </div> */}
 
         {/* File Size */}
         <div className="absolute bottom-2 right-2">
@@ -88,13 +88,13 @@ export function DetectionImageCard({
         </div>
 
         {/* Tracker ID Badge (if exists) */}
-        {image.metadata?.tracker_id && (
+        {/* {image.metadata?.tracker_id && (
           <div className="absolute bottom-2 left-2">
             <span className="px-2 py-1 bg-blue-600/80 backdrop-blur-sm text-white text-xs rounded font-medium">
               Tracker #{image.metadata.tracker_id}
             </span>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Info Section */}
