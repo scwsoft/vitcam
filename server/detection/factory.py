@@ -8,7 +8,7 @@ import supervision as sv
 from typing import Dict, Any
 from models.camera import CameraConfig
 from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
-from rfdetr import RFDETRMedium, RFDETRBase, RFDETRNano
+from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRBase, RFDETRNano
 from config.settings import settings
 from supabase import create_client, Client
 
@@ -51,7 +51,7 @@ class CameraPredictorFactory:
             elif torch.backends.mps.is_available(): device = "mps"
             else : device ="cpu"
 
-            model = RFDETRNano(resolution=640, device=device)
+            model = RFDETRSmall(resolution=640, device=device)
             model.optimize_for_inference(compile=False) 
             logger.info(f"Loading model RFDETRMedium on device: {device}")
 
