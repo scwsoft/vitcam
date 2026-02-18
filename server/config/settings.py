@@ -13,7 +13,8 @@ class Settings:
     SUPABASE_URL = os.getenv("SUPABASE_URL", "your-supabase-url")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-supabase-key")
     SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "vitcam-recordings")
-    
+     # Model Configuration - Small, Meduim, Large, Edge
+    MODEL_SIZE= os.getenv("MODEL_SIZE")
     WEBRTC_STUN_SERVERS = os.getenv("WEBRTC_STUN_SERVERS")
     WEBRTC_TURN_SERVER = os.getenv("WEBRTC_TURN_SERVER")
     WEBRTC_TURN_USERNAME = os.getenv("WEBRTC_TURN_USERNAME")
@@ -43,7 +44,8 @@ class Settings:
     # Cache Configuration
     CACHE_TTL = 300  # seconds
     SETTINGS_CHECK_INTERVAL = 60  # seconds
-    
+
+   
     @classmethod
     def ensure_directories(cls):
         """Ensure required directories exist"""

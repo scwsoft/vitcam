@@ -8,9 +8,10 @@ import supervision as sv
 from typing import Dict, Any
 from models.camera import CameraConfig
 from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
-from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRBase, RFDETRNano
+from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano
 from config.settings import settings
 from supabase import create_client, Client
+from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
 
@@ -46,25 +47,44 @@ class CameraPredictorFactory:
         try:
             
             device = None
-
+            model = None
+            
             if torch.cuda.is_available(): device = "cuda"
             elif torch.backends.mps.is_available(): device = "mps"
             else : device ="cpu"
+          
+            if settings.MODEL_SIZE == "Large":
+                model = RFDETRLarge(device=device)
+                model.optimize_for_inference(compile=False) 
+            elif settings.MODEL_SIZE == "Medium": 
+                model = RFDETRMedium(device=device)
+                model.optimize_for_inference(compile=False) 
 
-            model = RFDETRSmall(resolution=640, device=device)
-            model.optimize_for_inference(compile=False) 
-            logger.info(f"Loading model RFDETRMedium on device: {device}")
+            elif settings.MODEL_SIZE == "Small": 
+                model = RFDETRSmall(device=device)
+                model.optimize_for_inference(compile=False) 
+
+            elif settings.MODEL_SIZE == "Nano": 
+                model = RFDETRNano(device=device)
+                model.optimize_for_inference(compile=False) 
+            
+            elif settings.MODEL_SIZE == "Edge": 
+                model = YOLO("yolo26s.pt")
+                device = None
+            
+
+            logger.info(f"Loading model {settings.MODEL_SIZE} on device: {device}")
 
             
             box_annotator = sv.BoxAnnotator(thickness=1)
             label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
             
             return {
-                'device': device,
-                'model': model,
-                'box_annotator': box_annotator,
-                'label_annotator': label_annotator
-            }
+                    'device': device,
+                    'model': model,
+                    'box_annotator': box_annotator,
+                    'label_annotator': label_annotator
+                }
             
         except Exception as e:
             logger.error(f"Failed to initialize model: {e}")

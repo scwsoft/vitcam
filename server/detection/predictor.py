@@ -17,6 +17,8 @@ import cv2
 import io
 import base64
 from pathlib import Path
+from config.settings import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -305,8 +307,15 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         try:
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
-            detections = self.model.predict(
-                converted_image, threshold=self.confidence_threshold
+           
+            if settings.MODEL_SIZE=="Edge":
+                
+              result = self.model(converted_image)[0]
+              detections = sv.Detections.from_ultralytics(result)
+
+            else : detections = self.model.predict(
+             converted_image, threshold=self.confidence_threshold
+            
             )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
@@ -445,18 +454,25 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         """
         Build display labels from raw model detections only.
         No tracker IDs involved — purely class names from the model output.
+
+        Note: Edge models use a 1-indexed class_id offset due to background class at index 0.
         """
+        is_edge = settings.MODEL_SIZE == "Edge"
         labels = []
+
         for class_id, _ in zip(detections.class_id, detections.confidence):
             try:
                 class_id = int(class_id) if class_id is not None else 0
             except (TypeError, ValueError):
                 class_id = 0
+
+            resolved_id = class_id + 1 if is_edge else class_id
             labels.append(
-                COCO_CLASSES[class_id]
-                if 0 <= class_id < len(COCO_CLASSES)
-                else f"class_{class_id}"
+                COCO_CLASSES[resolved_id]
+                if 0 <= resolved_id < len(COCO_CLASSES)
+                else f"class_{resolved_id}"
             )
+
         return labels
 
     # ── Internal: NMS helpers ─────────────────────────────────────────────────
@@ -596,10 +612,10 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     # ── Analytics logging ─────────────────────────────────────────────────────
 
     async def _log_tracked_detections(
-        self,
-        tracked_detections: "sv.Detections",
-        frame: np.ndarray,
-    ):
+    self,
+    tracked_detections: "sv.Detections",
+    frame: np.ndarray,
+):
         """
         Log tracker-confirmed detection events to the analytics buffer.
 
@@ -613,9 +629,12 @@ class CameraPredictorWithAnalytics(CameraPredictor):
 
         New tracker ID    → full insert event + optional isolated object image.
         Existing tracker ID → lightweight positional update, no image.
+
+        Note: Edge models use a 1-indexed class_id offset due to background class at index 0.
         """
         try:
             current_time      = datetime.now(tz=timezone.utc)
+            is_edge           = settings.MODEL_SIZE == "Edge"
             new_detections    = []
             update_detections = []
 
@@ -665,16 +684,17 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 if tracker_id is None:
                     continue
 
-                class_name = (
-                    COCO_CLASSES[class_id]
-                    if 0 <= class_id < len(COCO_CLASSES)
-                    else f"class_{class_id}"
+                resolved_id = class_id + 1 if is_edge else class_id
+                class_name  = (
+                    COCO_CLASSES[resolved_id]
+                    if 0 <= resolved_id < len(COCO_CLASSES)
+                    else f"class_{resolved_id}"
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────
                 if tracker_id not in self.tracked_objects:
                     self.tracked_objects[tracker_id] = {
-                        "class_id":    class_id,
+                        "class_id":    resolved_id,
                         "class_name":  class_name,
                         "first_seen":  time.time(),
                         "frame_count": 0,
@@ -704,7 +724,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                             single_det = sv.Detections(
                                 xyxy=np.array([bbox]),
                                 confidence=np.array([confidence]),
-                                class_id=np.array([class_id]),
+                                class_id=np.array([resolved_id]),
                                 tracker_id=np.array([tracker_id]),
                             )
                             save_frame = self.box_annotator.annotate(
@@ -732,7 +752,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                         "camera_name":       self.camera_config.name,
                         "camera_url":        self.camera_config.url,
                         "timestamp":         current_time.isoformat(),
-                        "object_class_id":   class_id,
+                        "object_class_id":   resolved_id,
                         "object_class_name": class_name,
                         "confidence":        confidence,
                         "bbox_x":      float(bbox[0]) if len(bbox) > 0 else 0.0,
