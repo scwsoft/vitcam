@@ -175,6 +175,16 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         self.image_quality         = max(1, min(100, image_quality))
         self.storage_bucket        = storage_bucket
         self.frame_color_format    = frame_color_format.upper()
+        self.camera_config = camera_config
+        self.device = shared_model['device']
+        self.model = shared_model['model']
+
+        # self.processor = shared_model['processor']
+        self.box_annotator = shared_model['box_annotator']
+        self.label_annotator = shared_model['label_annotator']
+        self.detection_classes = set(camera_config.detection_classes)
+        self.confidence_threshold = camera_config.odthreshold / 100.0
+    
 
         # ── Tracker initialisation ────────────────────────────────────────────
         try:
@@ -320,11 +330,11 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
-            # if self.detection_classes:
-            #     detections = detections[
-            #         np.isin(detections.class_id, list(self.detection_classes))
-            #     ]
-            #detections = detections[detections.confidence >= self.MIN_CONFIDENCE]
+            if self.detection_classes:
+                detections = detections[
+                    np.isin(detections.class_id, list(self.detection_classes))
+                ]
+            detections = detections[detections.confidence >= self.confidence_threshold]
 
             # # ── 3. Degenerate-box filter (w/h > 2 px) ────────────────────────
             # if len(detections) > 0:
