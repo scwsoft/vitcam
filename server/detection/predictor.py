@@ -12,7 +12,8 @@ from typing import Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timezone
 from models.camera import CameraConfig
-from rfdetr.util.coco_classes import COCO_CLASSES
+from config.constants import COCO_CLASS_NAMES
+
 import cv2
 import io
 import base64
@@ -80,7 +81,7 @@ class CameraPredictor:
             
             labels = []
             for class_id, confidence in zip(detections.class_id, detections.confidence):
-                class_name = COCO_CLASSES[class_id]
+                class_name = COCO_CLASS_NAMES[class_id]
                 labels.append(f"{class_name} {confidence:.2f}")
             
             annotated_frame = frame.copy()
@@ -307,13 +308,11 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         try:
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
-            class_index = 0
            
             if settings.MODEL_SIZE=="Edge":
                 
               result = self.model(converted_image)[0]
               detections = sv.Detections.from_ultralytics(result)
-              class_index=+1
 
             else : detections = self.model.predict(
              converted_image, threshold=self.confidence_threshold
@@ -321,38 +320,48 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
-            if self.detection_classes:
-                detections = detections[
-                    np.isin(detections.class_id + class_index, list(self.detection_classes))
-                ]
-            detections = detections[detections.confidence >= self.MIN_CONFIDENCE]
+            # if self.detection_classes:
+            #     detections = detections[
+            #         np.isin(detections.class_id, list(self.detection_classes))
+            #     ]
+            #detections = detections[detections.confidence >= self.MIN_CONFIDENCE]
 
-            # ── 3. Degenerate-box filter (w/h > 2 px) ────────────────────────
-            if len(detections) > 0:
-                boxes = detections.xyxy
-                valid = (
-                    (boxes[:, 2] - boxes[:, 0] > 2) &
-                    (boxes[:, 3] - boxes[:, 1] > 2)
-                )
-                detections = detections[valid]
+            # # ── 3. Degenerate-box filter (w/h > 2 px) ────────────────────────
+            # if len(detections) > 0:
+            #     boxes = detections.xyxy
+            #     valid = (
+            #         (boxes[:, 2] - boxes[:, 0] > 2) &
+            #         (boxes[:, 3] - boxes[:, 1] > 2)
+            #     )
+            #     detections = detections[valid]
 
-            # ── 4. Class-aware NMS ────────────────────────────────────────────
-            if len(detections) > 0:
-                detections = self._class_aware_nms(
-                    detections, iou_threshold=self.NMS_IOU_THRESHOLD
-                )
+            # # ── 4. Class-aware NMS ────────────────────────────────────────────
+            # if len(detections) > 0:
+            #     detections = self._class_aware_nms(
+            #         detections, iou_threshold=self.NMS_IOU_THRESHOLD
+            #     )
 
             # ── 5. Annotate frame using MODEL detections ──────────────────────
             #   Labels and boxes come entirely from the model; the tracker is
             #   not consulted here at all.
-            labels          = self._build_labels(detections)
+            # labels          = self._build_labels(detections)
+            # annotated_frame = frame.copy()
+            # annotated_frame = self.box_annotator.annotate(
+            #     scene=annotated_frame, detections=detections
+            # )
+            # annotated_frame = self.label_annotator.annotate(
+            #     scene=annotated_frame, detections=detections, labels=labels
+            # )
+
+
+            labels = []
+            for class_id, confidence in zip(detections.class_id, detections.confidence):
+                class_name = COCO_CLASS_NAMES[class_id]
+                labels.append(f"{class_name}")
+            
             annotated_frame = frame.copy()
-            annotated_frame = self.box_annotator.annotate(
-                scene=annotated_frame, detections=detections
-            )
-            annotated_frame = self.label_annotator.annotate(
-                scene=annotated_frame, detections=detections, labels=labels
-            )
+            annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
+            annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
 
             # ── 6. Run tracker on CLEAN frame → analytics only ────────────────
             #   Pass `frame` (not `annotated_frame`) so the DeepSORT embedder
@@ -459,7 +468,6 @@ class CameraPredictorWithAnalytics(CameraPredictor):
 
         Note: Edge models use a 1-indexed class_id offset due to background class at index 0.
         """
-        is_edge = settings.MODEL_SIZE == "Edge"
         labels = []
 
         for class_id, _ in zip(detections.class_id, detections.confidence):
@@ -468,11 +476,10 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             except (TypeError, ValueError):
                 class_id = 0
 
-            resolved_id = class_id + 1 if is_edge else class_id
             labels.append(
-                COCO_CLASSES[resolved_id]
-                if 0 <= resolved_id < len(COCO_CLASSES)
-                else f"class_{resolved_id}"
+                COCO_CLASS_NAMES[class_id]
+                if 0 <= class_id < len(COCO_CLASS_NAMES)
+                else f"class_{class_id}"
             )
 
         return labels
@@ -636,7 +643,6 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         """
         try:
             current_time      = datetime.now(tz=timezone.utc)
-            is_edge           = settings.MODEL_SIZE == "Edge"
             new_detections    = []
             update_detections = []
 
@@ -686,17 +692,16 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 if tracker_id is None:
                     continue
 
-                resolved_id = class_id + 1 if is_edge else class_id
                 class_name  = (
-                    COCO_CLASSES[resolved_id]
-                    if 0 <= resolved_id < len(COCO_CLASSES)
-                    else f"class_{resolved_id}"
+                    COCO_CLASS_NAMES[class_id]
+                    if 0 <= class_id < len(COCO_CLASS_NAMES)
+                    else f"class_{class_id}"
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────
                 if tracker_id not in self.tracked_objects:
                     self.tracked_objects[tracker_id] = {
-                        "class_id":    resolved_id,
+                        "class_id":    class_id,
                         "class_name":  class_name,
                         "first_seen":  time.time(),
                         "frame_count": 0,
@@ -726,7 +731,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                             single_det = sv.Detections(
                                 xyxy=np.array([bbox]),
                                 confidence=np.array([confidence]),
-                                class_id=np.array([resolved_id]),
+                                class_id=np.array([class_id]),
                                 tracker_id=np.array([tracker_id]),
                             )
                             save_frame = self.box_annotator.annotate(
@@ -754,7 +759,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                         "camera_name":       self.camera_config.name,
                         "camera_url":        self.camera_config.url,
                         "timestamp":         current_time.isoformat(),
-                        "object_class_id":   resolved_id,
+                        "object_class_id":   class_id,
                         "object_class_name": class_name,
                         "confidence":        confidence,
                         "bbox_x":      float(bbox[0]) if len(bbox) > 0 else 0.0,
