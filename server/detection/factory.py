@@ -69,7 +69,7 @@ class CameraPredictorFactory:
                 model.optimize_for_inference(compile=False) 
             
             elif settings.MODEL_SIZE == "Edge": 
-                model = YOLO("yolo26s.pt")
+                model = YOLO("yolo26n_float32.tflite")
                 device = None
             
 
