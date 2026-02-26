@@ -62,6 +62,14 @@ const nextConfig: NextConfig = {
                 ],
             },
             {
+                source: '/:cameras*',
+                headers: [
+                        {
+                          key: 'cache-control', value: 'no-cache',
+                        },
+                ],
+            },
+            {
                 source: '/:tools*',
                 headers: [
                         {
