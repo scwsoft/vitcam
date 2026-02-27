@@ -17,7 +17,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
         type: camera.type || '',
         url: camera.url || '',
         description: camera.description || '',
-        odthredshold: camera.odthredshold || 50,
+        odthreshold: camera.odthreshold || 50,
         is_detection: camera.is_detection || false,
         odclasses: CameraService.parseOdclassesFromDb(camera.odclasses),
         encoder: camera.encoder || '',
@@ -34,7 +34,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
       
       // When detection is disabled, reset to defaults
       if (field === 'is_detection' && !value) {
-        newData.odthredshold = 50
+        newData.odthreshold = 50
         newData.odclasses = []
       }
       
@@ -54,7 +54,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
     if (field === 'is_detection' && !value) {
       setErrors(prev => ({
         ...prev,
-        odthredshold: undefined,
+        odthreshold: undefined,
         odclasses: undefined
       }))
     }
@@ -98,8 +98,8 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
     }
 
     if (formData.is_detection) {
-      if (formData.odthredshold < 1 || formData.odthredshold > 100) {
-        newErrors.odthredshold = 'Threshold must be between 1-100'
+      if (formData.odthreshold < 1 || formData.odthreshold > 100) {
+        newErrors.odthreshold = 'Threshold must be between 1-100'
       }
       // Note: odclasses validation removed - classes are optional
       // Empty classes defaults to all classes selected (per original implementation)

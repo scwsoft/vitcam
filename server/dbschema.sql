@@ -4,7 +4,7 @@ create table public.camera (
   type text null,
   url text null,
   description text null,
-  odthredshold integer null,
+  odthreshold integer null,
   is_detection boolean null default false,
   odclasses text null,
   encoder text null,

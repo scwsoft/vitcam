@@ -59,25 +59,25 @@ export function DetectionSettings({ formData, errors, onUpdate }: DetectionSetti
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="odthredshold" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <Label htmlFor="odthreshold" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Detection Threshold (%)
             </Label>
             <Input
-              id="odthredshold"
+              id="odthreshold"
               type="number"
               min="1"
               max="100"
-              value={formData.odthredshold}
-              onChange={(e) => onUpdate('odthredshold', parseInt(e.target.value))}
+              value={formData.odthreshold}
+              onChange={(e) => onUpdate('odthreshold', parseInt(e.target.value))}
               disabled={!formData.is_detection}
               className={`${
                 !formData.is_detection 
                   ? 'opacity-50 cursor-not-allowed' 
                   : 'focus:ring-purple-500 focus:border-purple-500'
-              } ${errors.odthredshold ? 'border-red-500' : ''}`}
+              } ${errors.odthreshold ? 'border-red-500' : ''}`}
             />
-            {errors.odthredshold && (
-              <p className="text-xs text-red-500">{errors.odthredshold}</p>
+            {errors.odthreshold && (
+              <p className="text-xs text-red-500">{errors.odthreshold}</p>
             )}
           </div>
 

@@ -12,7 +12,7 @@ interface ICameraProps {
   type: string
   url: string
   description: string
-  odthredshold: number
+  odthreshold: number
   is_detection: boolean
   odclasses: string
   encoder: string
@@ -26,7 +26,7 @@ interface CameraFormData {
   type: string
   url: string
   description: string
-  odthredshold: number
+  odthreshold: number
   is_detection: boolean
   odclasses: string
   encoder: string

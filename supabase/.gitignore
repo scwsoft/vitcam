@@ -1,7 +1,8 @@
-volumes/db/data
-volumes/storage
-.env
-test.http
-docker-compose.override.yml
-*.pyc
+# Supabase
+.branches
+.temp
 
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

@@ -128,7 +128,7 @@ private static transformFormDataToPayload(formData: CameraFormData) {
     type: formData.type,
     url: formData.url,
     description: formData.description,
-    odthredshold: formData.odthredshold,
+    odthreshold: formData.odthreshold,
     is_detection: formData.is_detection,
     odclasses: odclassesString,
     encoder: formData.encoder,

@@ -4,7 +4,7 @@ export interface Camera {
   type: string
   url: string
   description?: string
-  odthredshold: number
+  odthreshold: number
   is_detection: boolean
   odclasses: string
   encoder: string
@@ -20,7 +20,7 @@ export interface CameraFormData {
   type: string
   url: string
   description: string
-  odthredshold: number
+  odthreshold: number
   is_detection: boolean
   odclasses: string[]
   encoder: string
@@ -34,7 +34,7 @@ export interface CameraFormErrors {
   type?: string
   url?: string
   description?: string
-  odthredshold?: string
+  odthreshold?: string
   is_detection?: string
   odclasses?: string
   encoder?: string
