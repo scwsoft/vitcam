@@ -190,6 +190,10 @@ if [[ "$INSTALL_SERVER" == "true" || "$INSTALL_CLIENT" == "true" ]]; then
     step "Cloning VitCam repository"
     if [[ -d "$VITCAM_DIR/.git" ]]; then
         ok "Already cloned — pulling latest"; git -C "$VITCAM_DIR" pull --quiet
+    elif [[ -d "$VITCAM_DIR" ]]; then
+        warn "$VITCAM_DIR exists but is not a git repo (leftover from a partial uninstall) — removing and re-cloning"
+        rm -rf "$VITCAM_DIR"
+        git clone "$VITCAM_REPO" "$VITCAM_DIR"; ok "Cloned to $VITCAM_DIR"
     else
         git clone "$VITCAM_REPO" "$VITCAM_DIR"; ok "Cloned to $VITCAM_DIR"
     fi
