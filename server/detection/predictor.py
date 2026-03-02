@@ -367,7 +367,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             labels = []
             for class_id, confidence in zip(detections.class_id, detections.confidence):
                 class_name = COCO_CLASS_NAMES[class_id]
-                labels.append(f"{class_name} {confidence:.2f}")
+                labels.append(f"{class_name}")
             
             annotated_frame = frame.copy()
             annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
@@ -704,6 +704,8 @@ class CameraPredictorWithAnalytics(CameraPredictor):
 
                 class_name  = (
                     COCO_CLASS_NAMES[class_id]
+                    if 0 <= class_id < len(COCO_CLASS_NAMES)
+                    else f"class_{class_id}"
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────
