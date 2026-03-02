@@ -69,9 +69,15 @@ class CameraPredictorFactory:
                 model.optimize_for_inference(compile=False) 
             
             elif settings.MODEL_SIZE == "Edge": 
-                model = YOLO("yolo26n_float32.tflite")
+                model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
                 device = None
-            
+
+            elif settings.MODEL_SIZE == "Custom": 
+                model =  RFDETRMedium(device=device,
+                          pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
+                          pretrained=True)
+                model.optimize_for_inference(compile=False) 
+
 
             logger.info(f"Loading model {settings.MODEL_SIZE} on device: {device}")
 
