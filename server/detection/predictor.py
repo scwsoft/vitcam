@@ -704,8 +704,6 @@ class CameraPredictorWithAnalytics(CameraPredictor):
 
                 class_name  = (
                     COCO_CLASS_NAMES[class_id]
-                    if 0 <= class_id < len(COCO_CLASS_NAMES)
-                    else f"class_{class_id}"
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────
