@@ -518,9 +518,18 @@ if [[ "$INSTALL_SERVER" == "true" ]]; then
     # 9b. supabase init
     step "Initialising Supabase local project"
     cd "$VITCAM_DIR"
-    [[ -f "$VITCAM_DIR/supabase/config.toml" ]] \
-        && ok "Already initialised" \
-        || { $SUPABASE_SUDO_CMD init; ok "Supabase project initialised"; }
+    if [[ -f "$VITCAM_DIR/supabase/config.toml" ]]; then
+        ok "Already initialised"
+    else
+        $SUPABASE_SUDO_CMD init
+        ok "Supabase project initialised"
+    fi
+    # supabase init runs via SUPABASE_SUDO_CMD (root), so the supabase/ directory
+    # ends up owned by root. Fix ownership now so all subsequent writes work as
+    # the real user without needing sudo on every mkdir/cat/rm below.
+    sudo chown -R "$REAL_USER" "$VITCAM_DIR/supabase" 2>/dev/null \
+        && ok "Ownership of $VITCAM_DIR/supabase restored to $REAL_USER" \
+        || warn "Could not chown $VITCAM_DIR/supabase — subsequent writes may fail"
 
     # 9c. Migration SQL — always overwrite to ensure no storage.* present
     step "Writing database migration"
@@ -894,8 +903,14 @@ fi  # end server/supabase block
 if [[ "$INSTALL_SERVER" == "true" ]]; then
     step "Creating systemd service (vitcam.service)"
     PYTHON_EXEC="$VENV_DIR/bin/python"
+
     MAIN_PY="$SERVER_DIR/main.py"
-    [[ ! -f "$MAIN_PY" ]] && MAIN_PY="$SERVER_DIR/vitcam-server.py"
+    if [[ -f "$MAIN_PY" ]]; then
+        ok "Server entry point: $MAIN_PY"
+    else
+        warn "Entry point not found: $MAIN_PY"
+        warn "Ensure main.py exists in $SERVER_DIR before starting the service"
+    fi
 
     SERVICE_CONTENT="[Unit]
 Description=VitCam Camera Service
