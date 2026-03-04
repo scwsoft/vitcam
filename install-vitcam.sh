@@ -404,6 +404,7 @@ REBEOF
 
     # Write PM2 ecosystem config
     PM2_CONFIG="$FRONTEND_DIR/ecosystem.config.js"
+    mkdir -p "$FRONTEND_DIR"
     NODE_BIN="$(command -v node)"
     cat > "$PM2_CONFIG" << PM2EOF
 module.exports = {
