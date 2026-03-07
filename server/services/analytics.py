@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from collections import defaultdict, deque
 from supabase import Client
-from config.constants import COCO_CLASS_NAMES
+from config.settings import COCO_CLASS_NAMES
 
 logger = logging.getLogger(__name__)
 

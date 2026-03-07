@@ -9,7 +9,6 @@
 
 from .settings import settings, Settings
 from .constants import (
-    COCO_CLASS_NAMES,
     RESOLUTION_CODEC_BITRATE_MAP,
     DEFAULT_CODEC_BITRATES,
     CODEC_CONTAINER_MAP,

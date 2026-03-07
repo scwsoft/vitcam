@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timezone
 from models.camera import CameraConfig
-from config.constants import COCO_CLASS_NAMES
+from config.settings import COCO_CLASS_NAMES
 
 import cv2
 import io
