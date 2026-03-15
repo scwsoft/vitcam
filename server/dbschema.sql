@@ -10,6 +10,8 @@ create table public.camera (
   encoder text null,
   resolution text null,
   fps integer null,
+  modelsize text null,
+  detectiontype text null,
   rectype text null,
   constraint camera_pkey primary key (id)
 ) TABLESPACE pg_default;

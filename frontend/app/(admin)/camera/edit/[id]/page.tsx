@@ -19,16 +19,13 @@ export default function EditCameraPage({ params }: EditCameraPageProps) {
   const { loading: authLoading } = useAuth()
   const { camera, loading: cameraLoading } = useCamera(id)
   const { formData, errors, submitting, updateField, handleSubmit } = useCameraForm(camera, true)
- 
-  const onSubmit = async (e) => {
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-   
     const result = await handleSubmit(id)
-   
     if (!result.success && result.error) {
       alert(result.error)
     }
-
   }
 
   if (authLoading || cameraLoading) {
@@ -47,7 +44,7 @@ export default function EditCameraPage({ params }: EditCameraPageProps) {
             <ArrowLeft size={18} className="mr-2" />
             Back to Cameras
           </Button>
-          
+
           <div className="space-y-2">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
               Edit Camera
@@ -69,10 +66,10 @@ export default function EditCameraPage({ params }: EditCameraPageProps) {
                   </div>
                   Camera Information
                 </h3>
-                <CameraFormFields 
-                  formData={formData} 
-                  errors={errors} 
-                  onUpdate={updateField} 
+                <CameraFormFields
+                  formData={formData}
+                  errors={errors}
+                  onUpdate={updateField}
                 />
               </div>
 
@@ -91,10 +88,10 @@ export default function EditCameraPage({ params }: EditCameraPageProps) {
 
             {/* Right Column - AI Detection Settings */}
             <div className="xl:col-span-1">
-              <DetectionSettings 
-                formData={formData} 
-                errors={errors} 
-                onUpdate={updateField} 
+              <DetectionSettings
+                formData={formData}
+                errors={errors}
+                onUpdate={updateField}
               />
             </div>
           </div>
@@ -109,10 +106,10 @@ export default function EditCameraPage({ params }: EditCameraPageProps) {
             >
               Cancel
             </Button>
-            
-            <Button 
-              type="submit" 
-              disabled={submitting} 
+
+            <Button
+              type="submit"
+              disabled={submitting}
               className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
             >
               {submitting ? (

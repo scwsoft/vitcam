@@ -82,102 +82,7 @@ export const DETECTION_CLASSES = {
     88: "teddy bear",
     89: "hair drier",
     90: "toothbrush"
-
-   // YOLO Coco Dataset
-    // 0: "person",
-    // 1: "bicycle",
-    // 2: "car",
-    // 3: "motorcycle",
-    // 4: "airplane",
-    // 5: "bus",
-    // 6: "train",
-    // 7: "truck",
-    // 8: "boat",
-    // 9: "traffic light",
-    // 10: "fire hydrant",
-    // 11: "stop sign",
-    // 12: "parking meter",
-    // 13: "bench",
-    // 14: "bird",
-    // 15: "cat",
-    // 16: "dog",
-    // 17: "horse",
-    // 18: "sheep",
-    // 19: "cow",
-    // 20: "elephant",
-    // 21: "bear",
-    // 22: "zebra",
-    // 23: "giraffe",
-    // 24: "backpack",
-    // 25: "umbrella",
-    // 26: "handbag",
-    // 27: "tie",
-    // 28: "suitcase",
-    // 29: "frisbee",
-    // 30: "skis",
-    // 31: "snowboard",
-    // 32: "sports ball",
-    // 33: "kite",
-    // 34: "baseball bat",
-    // 35: "baseball glove",
-    // 36: "skateboard",
-    // 37: "surfboard",
-    // 38: "tennis racket",
-    // 39: "bottle",
-    // 40: "wine glass",
-    // 41: "cup",
-    // 42: "fork",
-    // 43: "knife",
-    // 44: "spoon",
-    // 45: "bowl",
-    // 46: "banana",
-    // 47: "apple",
-    // 48: "sandwich",
-    // 49: "orange",
-    // 50: "broccoli",
-    // 51: "carrot",
-    // 52: "hot dog",
-    // 53: "pizza",
-    // 54: "donut",
-    // 55: "cake",
-    // 56: "chair",
-    // 57: "couch",
-    // 58: "potted plant",
-    // 59: "bed",
-    // 60: "dining table",
-    // 61: "toilet",
-    // 62: "tv",
-    // 63: "laptop",
-    // 64: "mouse",
-    // 65: "remote",
-    // 66: "keyboard",
-    // 67: "cell phone",
-    // 68: "microwave",
-    // 69: "oven",
-    // 70: "toaster",
-    // 71: "sink",
-    // 72: "refrigerator",
-    // 73: "book",
-    // 74: "clock",
-    // 75: "vase",
-    // 76: "scissors",
-    // 77: "teddy bear",
-    // 78: "hair drier",
-    // 79: "toothbrush"
-
-    // 1:"Accident",
-    // 2:"Bicycle",
-    // 3:"Bus",
-    // 4:"Car",
-    // 5:"License Plate",
-    // 6:"Motorcycle",
-    // 7:"Non Accident",
-    // 8:"Truck",
-    // 9:"With Helmet",
-    // 10:"Without Helmet"
 } as const
-
-
 
 export const INITIAL_FORM_DATA: CameraFormData = {
   name: '',
@@ -190,7 +95,9 @@ export const INITIAL_FORM_DATA: CameraFormData = {
   encoder: '',
   resolution: '1920x1080',
   fps: 30,
-  rectype: ''
+  rectype: '',
+  modelsize: 'Nano',
+  detectiontype: 'BoundingBox',
 }
 
 export const CAMERA_TYPES = ['RTSP', 'HTTP', 'Youtube Live'] as const
@@ -206,7 +113,7 @@ export const ENCODER_TYPES = [
   { value: 'h265', label: 'H.265 (HEVC)' },
   { value: 'mjpeg', label: 'MJPEG' },
   { value: 'vp8', label: 'VP8' },
-  { value: 'vp9', label: 'VP9' }
+  { value: 'vp9', label: 'VP9' },
 ] as const
 
 export const RESOLUTION_OPTIONS = [
@@ -214,7 +121,7 @@ export const RESOLUTION_OPTIONS = [
   { value: '1280x720', label: '1280x720 (HD)' },
   { value: '1920x1080', label: '1920x1080 (Full HD)' },
   { value: '2560x1440', label: '2560x1440 (2K)' },
-  { value: '3840x2160', label: '3840x2160 (4K)' }
+  { value: '3840x2160', label: '3840x2160 (4K)' },
 ] as const
 
 export const FPS_OPTIONS = [
@@ -222,5 +129,18 @@ export const FPS_OPTIONS = [
   { value: 15, label: '15 FPS' },
   { value: 24, label: '24 FPS' },
   { value: 30, label: '30 FPS' },
-  { value: 60, label: '60 FPS' }
+  { value: 60, label: '60 FPS' },
+] as const
+
+export const MODEL_SIZE_OPTIONS = [
+  { value: 'Large',  label: 'Large',  description: 'Highest accuracy, most compute' },
+  { value: 'Medium', label: 'Medium', description: 'Balanced accuracy and speed' },
+  { value: 'Small',  label: 'Small',  description: 'Faster inference, good accuracy' },
+  { value: 'Nano',   label: 'Nano',   description: 'Very fast, lightweight' },
+  { value: 'Edge',   label: 'Edge',   description: 'Optimised for edge devices' },
+] as const
+
+export const DETECTION_TYPE_OPTIONS = [
+  { value: 'BoundingBox',  label: 'Bounding Box',  description: 'Draw rectangles around detected objects' },
+  { value: 'Segmentation', label: 'Segmentation',  description: 'Pixel-level object masks' },
 ] as const

@@ -40,7 +40,7 @@ class CameraPredictor:
         self.model = shared_model['model']
 
         # self.processor = shared_model['processor']
-        self.box_annotator = shared_model['box_annotator']
+        self.annotator = shared_model['annotator']
         self.label_annotator = shared_model['label_annotator']
         self.detection_classes = set(camera_config.detection_classes)
         self.confidence_threshold = camera_config.odthreshold / 100.0
@@ -85,7 +85,7 @@ class CameraPredictor:
                 labels.append(f"{class_name} {confidence:.2f}")
             
             annotated_frame = frame.copy()
-            annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
+            annotated_frame = self.annotator.annotate(scene=annotated_frame, detections=detections)
             annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
             
             return annotated_frame
@@ -180,7 +180,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         self.model = shared_model['model']
 
         # self.processor = shared_model['processor']
-        self.box_annotator = shared_model['box_annotator']
+        self.bannotator = shared_model['annotator']
         self.label_annotator = shared_model['label_annotator']
         self.detection_classes = set(camera_config.detection_classes)
         self.confidence_threshold = camera_config.odthreshold / 100.0
@@ -319,7 +319,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
            
-            if settings.MODEL_SIZE=="Edge":
+            if self.camera_config.modelsize =="Edge":
                 
               result = self.model(converted_image)[0]
               detections = sv.Detections.from_ultralytics(result)
@@ -356,7 +356,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             #   not consulted here at all.
             # labels          = self._build_labels(detections)
             # annotated_frame = frame.copy()
-            # annotated_frame = self.box_annotator.annotate(
+            # annotated_frame = self.annotator.annotate(
             #     scene=annotated_frame, detections=detections
             # )
             # annotated_frame = self.label_annotator.annotate(
@@ -370,7 +370,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 labels.append(f"{class_name}")
             
             annotated_frame = frame.copy()
-            annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
+            annotated_frame = self.annotator.annotate(scene=annotated_frame, detections=detections)
             annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
 
             # ── 6. Run tracker on CLEAN frame → analytics only ────────────────
@@ -380,7 +380,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 tracked_detections = self._run_tracker(detections, frame)
                 if tracked_detections is not None and len(tracked_detections) > 0:
                     asyncio.create_task(
-                        self._log_tracked_detections(tracked_detections, frame)
+                        self._log_tracked_detections(tracked_detections, annotated_frame)
                     )
 
             return annotated_frame
@@ -742,7 +742,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                                 class_id=np.array([class_id]),
                                 tracker_id=np.array([tracker_id]),
                             )
-                            save_frame = self.box_annotator.annotate(
+                            save_frame = self.annotator.annotate(
                                 scene=save_frame, detections=single_det
                             )
                             save_frame = self.label_annotator.annotate(

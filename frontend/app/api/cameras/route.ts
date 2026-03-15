@@ -1,7 +1,6 @@
 // app/api/cameras/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { ICameraProps } from "@types/CameraType";
 
 export async function GET(request: NextRequest) {
   try {

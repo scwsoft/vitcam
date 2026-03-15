@@ -24,6 +24,9 @@ class CameraConfig:
     rectype: Optional[str] = "none"
     container: Optional[str] = "webm"
     convert_formats: Optional[List[str]] = None
+    modelsize: Optional[str] = "Nano"
+    detectiontype: Optional[str] = "BoundingBox"
+
     
     @property
     def detection_classes(self) -> List[int]:

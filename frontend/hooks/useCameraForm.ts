@@ -23,42 +23,46 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
         encoder: camera.encoder || '',
         resolution: camera.resolution || '1920x1080',
         fps: camera.fps || 30,
-        rectype: camera.rectype || ''
+        rectype: camera.rectype || '',
+        modelsize: camera.modelsize || 'Nano',
+        detectiontype: camera.detectiontype || 'BoundingBox',
       })
     }
   }, [camera, isEditing])
 
-  const updateField = useCallback((field: keyof CameraFormData, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value }
-      
-      // When detection is disabled, reset to defaults
+  const updateField = useCallback(
+    (field: keyof CameraFormData, value: any) => {
+      setFormData((prev) => {
+        const newData = { ...prev, [field]: value }
+
+        // When detection is disabled, reset detection-related fields to defaults
+        if (field === 'is_detection' && !value) {
+          newData.odthreshold = 50
+          newData.odclasses = []
+        }
+
+        // When detection is enabled and no classes are selected, auto-select all
+        if (field === 'is_detection' && value && prev.odclasses.length === 0) {
+          newData.odclasses = Object.values(DETECTION_CLASSES)
+        }
+
+        return newData
+      })
+
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+
       if (field === 'is_detection' && !value) {
-        newData.odthreshold = 50
-        newData.odclasses = []
+        setErrors((prev) => ({
+          ...prev,
+          odthreshold: undefined,
+          odclasses: undefined,
+        }))
       }
-      
-      // When detection is enabled and no classes selected, auto-select all classes
-      // This provides better UX - matching the default behavior when loading from DB
-      if (field === 'is_detection' && value && prev.odclasses.length === 0) {
-        newData.odclasses = Object.values(DETECTION_CLASSES)
-      }
-      
-      return newData
-    })
-    
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }))
-    }
-    
-    if (field === 'is_detection' && !value) {
-      setErrors(prev => ({
-        ...prev,
-        odthreshold: undefined,
-        odclasses: undefined
-      }))
-    }
-  }, [errors])
+    },
+    [errors],
+  )
 
   const validateForm = useCallback((): boolean => {
     const newErrors: CameraFormErrors = {}
@@ -97,12 +101,18 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
       newErrors.rectype = 'Recording type is required'
     }
 
+    if (!formData.modelsize) {
+      newErrors.modelsize = 'Model size is required'
+    }
+
+    if (!formData.detectiontype) {
+      newErrors.detectiontype = 'Detection type is required'
+    }
+
     if (formData.is_detection) {
       if (formData.odthreshold < 1 || formData.odthreshold > 100) {
-        newErrors.odthreshold = 'Threshold must be between 1-100'
+        newErrors.odthreshold = 'Threshold must be between 1–100'
       }
-      // Note: odclasses validation removed - classes are optional
-      // Empty classes defaults to all classes selected (per original implementation)
     }
 
     setErrors(newErrors)
@@ -123,9 +133,9 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
       return { success: true }
     } catch (error) {
       console.error('Error saving camera:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to save camera' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save camera',
       }
     } finally {
       setSubmitting(false)
@@ -143,6 +153,6 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
     submitting,
     updateField,
     handleSubmit,
-    resetForm
+    resetForm,
   }
 }

@@ -110,7 +110,7 @@ class DatabaseManager:
             cache_key = f"camera_{camera_url}"
             current_time = time.time()
             
-            # Return cached config if fresh
+            #Return cached config if fresh
             if (cache_key in self._camera_cache and 
                 cache_key in self._last_cache_update and
                 current_time - self._last_cache_update[cache_key] < self._cache_ttl):
@@ -144,6 +144,8 @@ class DatabaseManager:
                 encoder=encoder,
                 resolution=camera_data.get('resolution', '640x480'),
                 fps=camera_data.get('fps', 30),
+                modelsize=camera_data.get('modelsize'),
+                detectiontype=camera_data.get('detectiontype'),
                 rectype=camera_data.get('rectype', 'none'),
                 container=container,
                 convert_formats=camera_data.get('convert_formats')
@@ -188,6 +190,8 @@ class DatabaseManager:
                     encoder=encoder,
                     resolution=camera_data.get('resolution', '640x480'),
                     fps=camera_data.get('fps', 30),
+                    modelsize=camera_data.get('modelsize'),
+                    detectiontype=camera_data.get('detectiontype'),
                     rectype=camera_data.get('rectype', 'none'),
                     container=container,
                     convert_formats=camera_data.get('convert_formats')

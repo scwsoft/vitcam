@@ -219,22 +219,26 @@ class ConnectionManager:
         Returns:
             Camera predictor instance
         """
-        cache_key = camera_config.url
+        #cache_key = camera_config.url
         from utils.globals import get_analytics_manager
         analytics_manager = get_analytics_manager()
         
-        if cache_key not in self.predictor_cache:
-            # config = CameraPredictorFactory.MODEL_CONFIGS[ModelType.RFDETR_MEDIUM]
-            # print(f"Optimization enabled: {config['optimize_for_inference']}")
-            predictor = await CameraPredictorFactory.create_predictor(
+        # if cache_key not in self.predictor_cache:
+        #     # config = CameraPredictorFactory.MODEL_CONFIGS[ModelType.RFDETR_MEDIUM]
+        #     # print(f"Optimization enabled: {config['optimize_for_inference']}")
+        #     predictor = await CameraPredictorFactory.create_predictor(
+        #         camera_config, 
+        #         analytics_manager
+        #     )
+        #     self.predictor_cache[cache_key] = predictor
+        # else:
+        #     predictor = self.predictor_cache[cache_key]
+        #     predictor.update_config(camera_config)
+        predictor = await CameraPredictorFactory.create_predictor(
                 camera_config, 
                 analytics_manager
             )
-            self.predictor_cache[cache_key] = predictor
-        else:
-            predictor = self.predictor_cache[cache_key]
-            predictor.update_config(camera_config)
-            
+            #self.predictor_cache[cache_key] = predictor    
         return predictor
     
     def stop_video_track(self, rtsp_url: str, screen_type: str = "full_screen", 

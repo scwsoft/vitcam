@@ -11,6 +11,8 @@ export interface Camera {
   resolution: string
   fps: number
   rectype: string
+  modelsize: string
+  detectiontype: string
   created_at?: string
   updated_at?: string
 }
@@ -27,6 +29,8 @@ export interface CameraFormData {
   resolution: string
   fps: number
   rectype: string
+  modelsize: string
+  detectiontype: string
 }
 
 export interface CameraFormErrors {
@@ -41,8 +45,12 @@ export interface CameraFormErrors {
   resolution?: string
   fps?: string
   rectype?: string
+  modelsize?: string
+  detectiontype?: string
 }
 
-export type CameraType = 'RTSP' | 'HTTP' | 'Youtube Live' 
-export type RecordingType = 'continuous' | 'motion' | 'none' 
+export type CameraType = 'RTSP' | 'HTTP' | 'Youtube Live'
+export type RecordingType = 'continuous' | 'motion' | 'none'
 export type EncoderType = 'h264' | 'h265' | 'mjpeg' | 'vp8' | 'vp9'
+export type ModelSize = 'Large' | 'Medium' | 'Small' | 'Nano' | 'Edge'
+export type DetectionType = 'BoundingBox' | 'Segmentation'

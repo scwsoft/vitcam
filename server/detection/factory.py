@@ -8,10 +8,11 @@ import supervision as sv
 from typing import Dict, Any
 from models.camera import CameraConfig
 from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
-from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano
+from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano, RFDETRSegMedium, RFDETRSegSmall, RFDETRSegLarge,RFDETRSegNano
 from config.settings import settings
 from supabase import create_client, Client
 from ultralytics import YOLO
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,21 +23,19 @@ class CameraPredictorFactory:
     _model_lock = asyncio.Lock()
     
     @classmethod
-    async def get_shared_model(cls) -> Dict[str, Any]:
+    async def get_shared_model(cls, camera_config: CameraConfig) -> Dict[str, Any]:
         """
         Get or create shared model instance
         
         Returns:
             Dictionary with shared model resources
         """
-        if cls._model_instance is None:
-            async with cls._model_lock:
-                if cls._model_instance is None:
-                    cls._model_instance = await cls._initialize_model()
+        async with cls._model_lock:
+                    cls._model_instance = await cls._initialize_model(camera_config)
         return cls._model_instance
     
     @classmethod
-    async def _initialize_model(cls) -> Dict[str, Any]:
+    async def _initialize_model(cls, camera_config:CameraConfig) -> Dict[str, Any]:
         """
         Initialize the shared detection model
         
@@ -48,51 +47,83 @@ class CameraPredictorFactory:
             
             device = None
             model = None
+            print(f" camera config: {camera_config}")
             
             if torch.cuda.is_available(): device = "cuda"
             elif torch.backends.mps.is_available(): device = "mps"
             else : device ="cpu"
           
-            if settings.MODEL_SIZE == "Large":
+            if camera_config.modelsize == "Large" and camera_config.detectiontype == 'BoundingBox':
                 model = RFDETRLarge(device=device)
                 model.optimize_for_inference(compile=False) 
-            elif settings.MODEL_SIZE == "Medium": 
+            
+            elif camera_config.modelsize  == "Medium" and camera_config.detectiontype == 'BoundingBox': 
                 model = RFDETRMedium(device=device)
                 model.optimize_for_inference(compile=False) 
 
-            elif settings.MODEL_SIZE == "Small": 
+            elif camera_config.modelsize  == "Small" and camera_config.detectiontype == 'BoundingBox':  
                 model = RFDETRSmall(device=device)
                 model.optimize_for_inference(compile=False) 
 
-            elif settings.MODEL_SIZE == "Nano": 
+            elif camera_config.modelsize  == "Nano" and camera_config.detectiontype == 'BoundingBox': 
                 model = RFDETRNano(device=device)
                 model.optimize_for_inference(compile=False) 
             
-            elif settings.MODEL_SIZE == "Edge": 
+            elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'BoundingBox':  
                 model = YOLO("yolo26n_float32.tflite")
                 device = None
             
-            elif settings.MODEL_SIZE == "Edge": 
+            elif  camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':  
                 model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
                 model = YOLO("yolo26n_float32.tflite")
                 device = None
 
-            elif settings.MODEL_SIZE == "Custom": 
+            elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
                 model =  RFDETRMedium(device=device,
                           pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
                           pretrained=True)
                 model.optimize_for_inference(compile=False) 
-
-            logger.info(f"Loading model {settings.MODEL_SIZE} on device: {device}")
-
             
-            box_annotator = sv.BoxAnnotator(thickness=1)
+            
+            if camera_config.modelsize == "Large" and camera_config.detectiontype == 'Segmentation':
+                model = RFDETRSegLarge(device=device)
+                model.optimize_for_inference(compile=False) 
+            
+            elif camera_config.modelsize  == "Medium" and camera_config.detectiontype == 'Segmentation': 
+                model = RFDETRSegMedium(device=device)
+                model.optimize_for_inference(compile=False) 
+
+            elif camera_config.modelsize  == "Small" and camera_config.detectiontype == 'Segmentation':  
+                model = RFDETRSegSmall(device=device)
+                model.optimize_for_inference(compile=False) 
+
+            elif camera_config.modelsize  == "Nano" and camera_config.detectiontype == 'Segmentation': 
+                model = RFDETRSegNano(device=device)
+                model.optimize_for_inference(compile=False) 
+            
+            elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'Segmentation':  
+                model = YOLO("yolo26n_float32.tflite")
+                device = None
+            
+            elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'Segmentation':  
+                model =  RFDETRSegMedium(device=device,
+                          pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
+                          pretrained=True)
+                model.optimize_for_inference(compile=False) 
+
+            logger.info(f"Loading model {camera_config.modelsize} on device: {device}")
+
+            if camera_config.detectiontype == "BoundingBox":
+                annotator = sv.BoxAnnotator(thickness=1)
+            else:
+                annotator = sv.MaskAnnotator()
+            
             label_annotator = sv.LabelAnnotator(text_scale=0.5, text_thickness=1)
             
             return {
                     'device': device,
                     'model': model,
-                    'box_annotator': box_annotator,
+                    'annotator': annotator,
                     'label_annotator': label_annotator
                 }
             
@@ -113,7 +144,7 @@ class CameraPredictorFactory:
             CameraPredictor instance
         """
         supabase = await cls.get_supabase_client()
-        shared_model = await cls.get_shared_model()
+        shared_model = await cls.get_shared_model(camera_config)
         
         if analytics_manager:
             return CameraPredictorWithAnalytics(camera_config, shared_model, 
