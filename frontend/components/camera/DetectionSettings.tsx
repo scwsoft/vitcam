@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { CameraFormData, CameraFormErrors } from '@/types/camera.types'
 import {
   DETECTION_CLASSES,
+  CUSTOM_DETECTION_CLASSES,
   DETECTION_TYPE_OPTIONS,
   MODEL_SIZE_OPTIONS,
 } from '@/constants/camera.constants'
@@ -19,9 +20,13 @@ interface DetectionSettingsProps {
   onUpdate: (field: keyof CameraFormData, value: any) => void
 }
 
-const ALL_CLASS_NAMES = Object.values(DETECTION_CLASSES)
+const STANDARD_CLASS_NAMES = Object.values(DETECTION_CLASSES)
+const CUSTOM_CLASS_NAMES = Object.values(CUSTOM_DETECTION_CLASSES)
 
 export function DetectionSettings({ formData, errors, onUpdate }: DetectionSettingsProps) {
+  const isCustomModel = formData.modelsize === 'Custom'
+  const activeClassNames = isCustomModel ? CUSTOM_CLASS_NAMES : STANDARD_CLASS_NAMES
+
   const toggleClass = (className: string) => {
     const updated = formData.odclasses.includes(className)
       ? formData.odclasses.filter((c) => c !== className)
@@ -30,8 +35,8 @@ export function DetectionSettings({ formData, errors, onUpdate }: DetectionSetti
   }
 
   const toggleAllClasses = () => {
-    const allSelected = formData.odclasses.length === ALL_CLASS_NAMES.length
-    onUpdate('odclasses', allSelected ? [] : [...ALL_CLASS_NAMES])
+    const allSelected = formData.odclasses.length === activeClassNames.length
+    onUpdate('odclasses', allSelected ? [] : [...activeClassNames])
   }
 
   return (
@@ -155,17 +160,22 @@ export function DetectionSettings({ formData, errors, onUpdate }: DetectionSetti
               <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Tag size={14} />
                 Detection Classes
+                {isCustomModel && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-violet-400 text-violet-600 dark:text-violet-400">
+                    Custom
+                  </Badge>
+                )}
               </Label>
               <button
                 type="button"
                 onClick={toggleAllClasses}
                 className="text-xs text-violet-600 dark:text-violet-400 hover:underline"
               >
-                {formData.odclasses.length === ALL_CLASS_NAMES.length ? 'Deselect all' : 'Select all'}
+                {formData.odclasses.length === activeClassNames.length ? 'Deselect all' : 'Select all'}
               </button>
             </div>
             <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 p-2 space-y-1">
-              {ALL_CLASS_NAMES.map((cls) => {
+              {activeClassNames.map((cls) => {
                 const selected = formData.odclasses.includes(cls)
                 return (
                   <button
@@ -185,7 +195,7 @@ export function DetectionSettings({ formData, errors, onUpdate }: DetectionSetti
               })}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {formData.odclasses.length} of {ALL_CLASS_NAMES.length} classes selected
+              {formData.odclasses.length} of {activeClassNames.length} classes selected
             </p>
             {errors.odclasses && (
               <p className="text-xs text-red-500">{errors.odclasses}</p>

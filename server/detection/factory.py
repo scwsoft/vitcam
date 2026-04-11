@@ -79,9 +79,9 @@ class CameraPredictorFactory:
                 device = None
 
             elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
-                model =  RFDETRMedium(device=device,
+                model =  RFDETRBase(device=device,
                           pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
-                          pretrained=False)
+                          pretrained=True)
                 model.optimize_for_inference(compile=False) 
             
             

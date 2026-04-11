@@ -1,8 +1,13 @@
 import { createClient } from '@/utils/supabase/client'
 import { Camera, CameraFormData } from '@/types/camera.types'
-import { DETECTION_CLASSES } from '@/constants/camera.constants'
+import { DETECTION_CLASSES, CUSTOM_DETECTION_CLASSES } from '@/constants/camera.constants'
 
 const supabase = createClient()
+
+/** Pick the right class map based on model size. */
+function getClassMap(modelsize?: string): typeof DETECTION_CLASSES | typeof CUSTOM_DETECTION_CLASSES {
+  return modelsize === 'Custom' ? CUSTOM_DETECTION_CLASSES : DETECTION_CLASSES
+}
 
 export class CameraService {
   static readonly baseUrl = '/api/cameras'
@@ -96,20 +101,20 @@ export class CameraService {
   }
 
   private static transformFormDataToPayload(formData: CameraFormData) {
-    // Map selected class names to their IDs
-    const allClassNames = Object.values(DETECTION_CLASSES)
+    const classMap = getClassMap(formData.modelsize)
+    const allClassNames = Object.values(classMap)
     const isAllSelected = formData.odclasses.length === allClassNames.length
 
     let odclassesString = ''
 
     if (isAllSelected) {
-      // All classes selected → store all class IDs explicitly
-      odclassesString = Object.keys(DETECTION_CLASSES).join(',')
+      // All classes selected → store all IDs for this class map
+      odclassesString = Object.keys(classMap).join(',')
     } else if (formData.odclasses.length > 0) {
-      // Specific classes selected → store their IDs
+      // Specific classes selected → resolve names → IDs within the correct map
       const selectedClassIds = formData.odclasses
         .map((className) => {
-          const entry = Object.entries(DETECTION_CLASSES).find(([, name]) => name === className)
+          const entry = Object.entries(classMap).find(([, name]) => name === className)
           return entry ? entry[0] : null
         })
         .filter((id): id is string => id !== null)
@@ -135,20 +140,25 @@ export class CameraService {
     }
   }
 
-  static parseOdclassesFromDb(odclasses: string): string[] {
-    // If odclasses is empty or not set, default to ALL classes
+  /**
+   * Parse comma-separated class IDs from the DB back into class name strings.
+   * Pass `modelsize` so the correct class map is used for the lookup.
+   */
+  static parseOdclassesFromDb(odclasses: string, modelsize?: string): string[] {
+    const classMap = getClassMap(modelsize)
+
+    // Empty → default to ALL classes for this model
     if (!odclasses || odclasses.trim() === '') {
-      return Object.values(DETECTION_CLASSES)
+      return Object.values(classMap)
     }
 
-    // Parse comma-separated class IDs and convert to class names
     return odclasses
       .split(',')
       .map((cls) => cls.trim())
       .filter(Boolean)
       .map((id) => {
         const classId = parseInt(id)
-        return DETECTION_CLASSES[classId as keyof typeof DETECTION_CLASSES] ?? ''
+        return classMap[classId as keyof typeof classMap] ?? ''
       })
       .filter((name) => name !== '')
   }

@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { CameraFormData, CameraFormErrors, Camera } from '@/types/camera.types'
-import { INITIAL_FORM_DATA, DETECTION_CLASSES } from '@/constants/camera.constants'
+import { INITIAL_FORM_DATA, DETECTION_CLASSES, CUSTOM_DETECTION_CLASSES } from '@/constants/camera.constants'
 import { CameraService } from '@/services/camera.service'
+
+const STANDARD_CLASS_NAMES = Object.values(DETECTION_CLASSES)
+const CUSTOM_CLASS_NAMES = Object.values(CUSTOM_DETECTION_CLASSES)
+
+/** Returns the full class list for a given modelsize. */
+function getDefaultClasses(modelsize: string): string[] {
+  return modelsize === 'Custom' ? [...CUSTOM_CLASS_NAMES] : [...STANDARD_CLASS_NAMES]
+}
 
 export function useCameraForm(camera?: Camera | null, isEditing = false) {
   const [formData, setFormData] = useState<CameraFormData>(INITIAL_FORM_DATA)
@@ -19,7 +27,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
         description: camera.description || '',
         odthreshold: camera.odthreshold || 50,
         is_detection: camera.is_detection || false,
-        odclasses: CameraService.parseOdclassesFromDb(camera.odclasses),
+        odclasses: CameraService.parseOdclassesFromDb(camera.odclasses, camera.modelsize),
         encoder: camera.encoder || '',
         resolution: camera.resolution || '1920x1080',
         fps: camera.fps || 30,
@@ -35,15 +43,21 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
       setFormData((prev) => {
         const newData = { ...prev, [field]: value }
 
-        // When detection is disabled, reset detection-related fields to defaults
+        // Turning detection OFF — reset detection-related fields
         if (field === 'is_detection' && !value) {
           newData.odthreshold = 50
           newData.odclasses = []
         }
 
-        // When detection is enabled and no classes are selected, auto-select all
+        // Turning detection ON — auto-select all classes for current modelsize
         if (field === 'is_detection' && value && prev.odclasses.length === 0) {
-          newData.odclasses = Object.values(DETECTION_CLASSES)
+          newData.odclasses = getDefaultClasses(prev.modelsize)
+        }
+
+        // Switching modelsize — reset odclasses to the new model's full class list
+        // (only when detection is active so the selection stays coherent)
+        if (field === 'modelsize' && prev.is_detection) {
+          newData.odclasses = getDefaultClasses(value)
         }
 
         return newData
