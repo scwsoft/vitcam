@@ -238,13 +238,18 @@ COCO_CLASS_NAMES = {
     # 10:"Without Helmet"
 }
 
+# CUSTOM_CLASS_NAMES = {
+#      1:"Accident",
+#      2:"Mild Accident",
+#      3:"Moderate Accident",
+#      4:"No Accident",
+#      5:"Severe Accident",
+#      6:"Vehicle"
+# }
+
 CUSTOM_CLASS_NAMES = {
-     1:"Accident",
-     2:"Mild Accident",
-     3:"Moderate Accident",
-     4:"No Accident",
-     5:"Severe Accident",
-     6:"Vehicle"
+     1:"Helmet",
+     2:"No Helmet"
 }
 
 # Comprehensive bitrate mapping based on resolution and codec
