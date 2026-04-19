@@ -4,12 +4,14 @@ create table public.camera (
   type text null,
   url text null,
   description text null,
-  odthredshold integer null,
+  odthreshold integer null,
   is_detection boolean null default false,
   odclasses text null,
   encoder text null,
   resolution text null,
   fps integer null,
+  modelsize text null,
+  detectiontype text null,
   rectype text null,
   constraint camera_pkey primary key (id)
 ) TABLESPACE pg_default;
@@ -135,11 +137,11 @@ ALTER TABLE "public"."object_detection_events" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."system_logs" ENABLE ROW LEVEL SECURITY;
 
-
--- Enable RLS on storage objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
-
+create policy "camera_policy" on "public"."camera" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
+create policy "general_settings_policy" on "public"."general_settings" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
+create policy "object_detection_events_policy" on "public"."object_detection_events" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
+create policy "profiles_policy" on "public"."profiles" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
+create policy "system_logs_policy" on "public"."system_logs" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
 
 
 -- Create storage schema tables (these need to exist before Storage API starts)
@@ -214,6 +216,12 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1 FROM storage.buckets WHERE id = 'detection-images'
 );
+
+
+
+-- Enable RLS on storage objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Allow authenticated uploads to vitcam-recordings" ON storage.objects;
