@@ -1,669 +1,579 @@
-<div align="center">
+# <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" /> 
+> **Self-hosted, on-premises AI camera surveillance and NVR platform**
 
-<img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/your-username/vitcam)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**🔒 Your Cameras. Your Data. Your Control. 🔒**
+**VitCam is a fully local, on-premises AI-powered camera surveillance and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — VitCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
 
-**Open Source • Privacy-First • Self-Hosted AI Video Surveillance**
+Connect your existing IP cameras and NVR systems via RTSP, and VitCam layers AI-powered object detection, real-time video streaming, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system. **Your footage stays on your network. Always.**
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![100% Open Source](https://img.shields.io/badge/open%20source-100%25-brightgreen.svg)](https://github.com/yourusername/vitcam)
-[![Self-Hosted](https://img.shields.io/badge/self--hosted-privacy%20focused-orange.svg)](README.md)
-[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://hub.docker.com/r/vitcam/vitcam)
-
-[Features](#features) • [Demo](#demo) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Contributing](#contributing)
-
-</div>
+> **Why on-premises?** Cloud-based surveillance services charge monthly fees, own your footage, and can go offline or shut down. VitCam gives you the capabilities of enterprise surveillance software with zero recurring costs, zero vendor lock-in, and full data sovereignty.
 
 ---
 
-## 🎯 Overview
+## Table of Contents
 
-VitCam is a **100% open-source, self-hosted** video surveillance and analytics system that puts **your privacy first**. Unlike cloud-based solutions that send your video feeds to third-party servers, VitCam runs entirely on **your own infrastructure**, giving you complete control over your data.
-
-Built for security professionals, privacy-conscious users, and smart home enthusiasts who refuse to compromise on data ownership, VitCam delivers enterprise-grade AI-powered surveillance without sacrificing privacy.
-
-### Why VitCam?
-
-- 🔒 **Complete Privacy** - Your video data never leaves your server. Period.
-- 🏠 **Self-Hosted** - Run on your own hardware, your network, your rules
-- 📖 **100% Open Source** - Fully auditable code with no hidden telemetry or backdoors
-- 🆓 **No Subscriptions** - No monthly fees, no cloud lock-in, no data mining
-- 🤖 **AI-Powered Detection** - State-of-the-art RT-DETR models running locally on your hardware
-- 🎥 **Real-Time Streaming** - Ultra-low latency WebRTC streaming within your private network
-- 🔍 **Smart Analytics** - Multi-agent AI workflow for automated security analysis - all processed locally
-- 📊 **Professional Dashboard** - Beautiful, intuitive interface for monitoring and analytics
-- 🐳 **Easy Deployment** - One-command Docker setup or traditional installation
-- 🌐 **Scalable Architecture** - From a single camera to hundreds, all under your control
-- 💾 **Your Storage** - Use local storage or your own cloud provider (Supabase, S3, etc.)
+- [Features](#features)
+- [NVR & IP Camera Compatibility](#nvr--ip-camera-compatibility)
+- [Architecture Overview](#architecture-overview)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [Quick Start (Ubuntu)](#quick-start-ubuntu)
+  - [Docker Setup](#docker-setup)
+  - [Manual Setup](#manual-setup)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [AI Models](#ai-models)
+- [Open-Core Edition](#open-core-edition)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🔒 Privacy & Open Source Commitment
+## NVR & IP Camera Compatibility
 
-### Your Data, Your Control
+VitCam supports multiple stream input protocols, so it works with a wide range of cameras, NVR systems, and even internet-based video sources — all processed and stored locally on your own machine.
 
-VitCam is built on a fundamental principle: **your security footage belongs to you and only you**.
+| Protocol | Source Examples | Notes |
+|----------|----------------|-------|
+| **RTSP** | IP cameras, NVR/DVR systems (Hikvision, Dahua, Reolink, Amcrest, etc.) | Primary protocol; recommended for on-premises cameras |
+| **HTTP / MJPEG** | Older IP cameras, embedded cameras, some IoT devices | Streams served as a continuous JPEG sequence over HTTP |
+| **YouTube Live** | Public live streams, traffic cams, public surveillance feeds | Useful for testing or monitoring public sources |
+| **USB / Webcam** | Local USB cameras attached to the VitCam host | Accessed directly by the backend |
+| **ONVIF** | Standard-compliant IP cameras | 🔜 Auto-discovery coming soon |
 
-- ✅ **Zero Cloud Dependency** - All processing happens locally on your hardware
-- ✅ **No Telemetry** - We don't collect, transmit, or sell your data
-- ✅ **No Phone-Home** - No analytics, no tracking, no external connections
-- ✅ **Air-Gap Capable** - Can run completely isolated from the internet
-- ✅ **Fully Auditable** - Every line of code is open for inspection
-- ✅ **Community Driven** - Developed transparently on GitHub
+> ⚠️ **Privacy & legal notice:** When connecting to any public or third-party stream (e.g. YouTube Live or public webcams), ensure you have the right to access and process that feed. VitCam does not condone unauthorized surveillance.
 
-### True Open Source
+### Stream URL Examples
 
-- 📖 **Apache 2.0 Licensed** - Use commercially, modify freely, with patent protection
-- 🔍 **No Hidden Code** - What you see is what you run
-- 🤝 **Community Owned** - No corporate overlords, no sudden licensing changes
-- 🛠️ **Fork Friendly** - Take it, customize it, make it yours
-- 🌍 **No Vendor Lock-In** - Your infrastructure, your choice
-- ⚖️ **Patent Grant** - Explicit protection against patent litigation
+**RTSP — NVR / IP Cameras (recommended for on-premises):**
 
-**Compare to Cloud Solutions:**
+```
+# Hikvision NVR — Channel 1
+rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101
 
-| Feature | VitCam | Cloud Services |
-|---------|--------|----------------|
-| Data Location | Your server | Their servers |
-| Privacy | 100% Private | Shared with provider |
-| Monthly Fees | $0 | $10-50+ per camera |
-| Internet Required | No* | Yes |
-| Video Access | You only | Provider can access |
-| License | Apache 2.0 Open Source | ❌ Proprietary |
-| AI Processing | Local | Cloud |
-| Lifetime Ownership | ✅ Yes | ❌ Subscription only |
+# Dahua NVR — Channel 2
+rtsp://admin:password@192.168.1.101:554/cam/realmonitor?channel=2&subtype=0
 
-*Internet only needed for remote access (optional)
+# Reolink camera
+rtsp://admin:password@192.168.1.102:554/h264Preview_01_main
 
----
+# Generic
+rtsp://username:password@<camera-ip>:<port>/<stream-path>
+```
 
-## ✨ Features
+**HTTP / MJPEG:**
 
-### Privacy-First Architecture
-- **Local Processing** - All AI inference runs on your hardware
-- **Encrypted Storage** - Your videos, encrypted with your keys
-- **No External APIs** - Zero dependencies on third-party services
-- **Private Network** - Operate entirely within your LAN
-- **Optional Remote Access** - Secure VPN/Tailscale integration when you need it
-- **Data Retention Control** - You decide how long to keep recordings
+```
+http://<camera-ip>/video.mjpg
+http://<camera-ip>/mjpeg/1
+http://username:password@<camera-ip>:<port>/videostream.cgi
+```
 
-### Real-Time Video Processing
-- **WebRTC Streaming** - Sub-second latency with dynamic bitrate adaptation
-- **Motion Detection** - Intelligent motion-triggered recording to save storage
-- **Multi-Camera Support** - Monitor unlimited cameras from a single dashboard
-- **H.264/WebM Recording** - Efficient video encoding with WebM-first strategy
+**YouTube Live:**
 
-### AI & Computer Vision
-- **Object Detection** - 80+ object classes with RT-DETR models
-- **Object Tracking** - Advanced DeepSORT tracking for persistent object identity
-- **Custom Detection Classes** - Configure which objects to detect per camera
-- **Real-Time Analytics** - Live detection statistics and insights
+```
+https://www.youtube.com/watch?v=<live-stream-id>
+```
 
-### Intelligent Security Features
-- **Agentic AI Workflow** - Multi-agent system for automated security analysis
-  - Detection Analysis Agent
-  - Threat Assessment Agent
-  - Pattern Recognition Agent
-- **Smart Alerts** - Configurable notifications based on detection rules
-- **Event Timeline** - Comprehensive audit trail of all detections
-
-### Modern Dashboard
-- **Real-Time Monitoring** - Live view of all connected cameras
-- **Analytics Visualization** - Charts and graphs for detection insights
-- **Advanced Filtering** - Filter by camera, date range, and object class
-- **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
-
-### Developer-Friendly
-- **Clean Architecture** - Modular, maintainable codebase following industry standards
-- **RESTful API** - Well-documented API for custom integrations
-- **Docker Support** - One-command deployment with docker-compose
-- **Extensive Documentation** - Comprehensive guides and API reference
+VitCam pulls each stream and processes it locally. For on-premises cameras, no internet access or port forwarding is required.
 
 ---
 
-## 🚀 Quick Start
+## Features
 
-Deploy your own private surveillance system in minutes. Everything runs on **your hardware**, under **your control**.
+### Core (Free & Open Source)
 
-### Prerequisites
+- **Live WebRTC streaming** — Low-latency real-time video feeds from multiple cameras in your browser
+- **AI object detection** — RF-DETR-based detection with support for people, vehicles, drones, helmets, and more
+- **Object tracking** — DeepSORT-based multi-object tracking with persistent IDs across frames
+- **Motion-triggered recording** — Automatically records video clips when motion or detections are detected
+- **Continuous recording mode** — Always-on recording with configurable retention
+- **Detection event storage** — All events stored in Supabase with timestamps, bounding boxes, and confidence scores
+- **Analytics dashboard** — Visualize detection trends, heatmaps, and activity over time
+- **Multi-camera management** — Add, configure, and monitor multiple camera streams from one interface
+- **Video management** — Browse and review recorded footage with Supabase Storage backend
+- **System logs viewer** — Real-time and historical system log access from the UI
+- **Datetime overlay** — Configurable timestamp overlays on video streams
+- **Supabase real-time** — Live UI updates via Supabase real-time subscriptions
+- **User authentication** — Full auth flows via Supabase Auth (email, OAuth)
+- **Profile management** — Per-user settings and preferences
+- **Self-hostable** — Runs entirely on your own hardware; your data never leaves your network
 
-- **Your own server/computer** (Raspberry Pi 4+, NUC, or any Linux machine)
-- Docker & Docker Compose (recommended) OR Python 3.11+, Node.js 18+, PostgreSQL 15+
-- **No cloud accounts required** (optional: Supabase for easier storage management)
+### AI Capabilities
 
-### Option 1: Docker - Complete Privacy (Recommended)
+- Person detection and counting
+- Vehicle detection and classification
+- Drone / UAV detection
+- Safety helmet detection
+- Custom model support (PyTorch `.pth`)
 
-Run VitCam entirely self-hosted with all data stored locally:
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        Browser                          │
+│              Next.js Frontend (WebRTC + UI)             │
+└──────────────────────┬──────────────────────────────────┘
+                       │ WebRTC / REST / Realtime
+┌──────────────────────▼──────────────────────────────────┐
+│                  Camera Server                         │
+│   aiortc WebRTC Server  │  FastAPI REST API             │
+│   RF-DETR Detection     │  DeepSORT Tracking            │
+│   Recording Engine      │                               │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+        Supabase             Supabase
+       (Postgres)             Storage
+      Auth, Events           Video Clips
+```
+
+VitCam is composed of two main services:
+
+**Frontend** — A Next.js application handling the web UI, WebRTC video rendering, real-time subscriptions, and user interactions.
+
+**Backend** — The Camera Server (FastAPI + aiortc) handling camera capture, AI inference with RF-DETR, object tracking with DeepSORT, and video recording.
+
+**Supabase** — Used as the primary database (Postgres), file storage (video clips, snapshots), and authentication provider. Can be self-hosted via Supabase's Docker stack or used with Supabase Cloud.
+
+---
+
+## Requirements
+
+### Minimum
+
+| Component | Requirement |
+|-----------|-------------|
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12 |
+| CPU | 4 cores, x86_64 |
+| RAM | 8 GB |
+| Storage | 50 GB (for OS, app, and recordings) |
+| GPU | Optional — NVIDIA GPU strongly recommended for AI inference |
+| Node.js | 18 or later |
+| Python | 3.10 or later |
+| Docker | 24.0 or later (for Docker-based setup) |
+
+### Recommended (for AI workloads)
+
+| Component | Recommendation |
+|-----------|----------------|
+| GPU | NVIDIA RTX 3060 or better (e.g., RTX 5060 Ti) |
+| VRAM | 8 GB minimum |
+| CUDA | 12.x |
+| RAM | 16–32 GB |
+
+> **Apple Silicon / macOS:** Experimental support via MLX inference backend. Docker-based setup is recommended. See [Apple Silicon Notes](#apple-silicon) below.
+
+---
+
+## Installation
+
+### Quick Start (Ubuntu)
+
+The fastest way to get VitCam running on a fresh Ubuntu machine:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/vitcam.git
+git clone https://github.com/your-username/vitcam.git
 cd vitcam
 
-# Copy environment configuration
-cp .env.example .env
-
-# Edit .env - configure for LOCAL STORAGE (no cloud required)
-nano .env
-
-# Start all services on YOUR server
-docker-compose up -d
-
-# Access your PRIVATE dashboard (only accessible on your network)
-open http://localhost:3000
+# Run the installer script
+chmod +x install.sh
+./install.sh
 ```
 
-**Your data never leaves this machine unless you explicitly configure remote access.**
+The installer will:
 
-### Option 2: Manual Installation
+1. Install system dependencies (Node.js, Python, ffmpeg, libGL, etc.)
+2. Set up a local Supabase instance via Docker
+3. Apply the database schema migrations
+4. Install frontend and backend dependencies
+5. Configure PM2 to manage the frontend and backend processes
+6. Start all services
 
-#### Backend Setup
+Once complete, open your browser at `http://localhost:3000`.
+
+Default credentials are printed at the end of the install script. **Change them immediately.**
+
+---
+
+### Docker Setup
+
+If you prefer a fully containerized setup:
 
 ```bash
-cd backend
+git clone https://github.com/your-username/vitcam.git
+cd vitcam
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Copy and edit environment configuration
+cp .env.example .env
+nano .env
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations
-alembic upgrade head
-
-# Start the server
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Start all services
+docker compose up -d
 ```
 
-#### Frontend Setup
+Services started by Docker Compose:
+
+- `vitcam-frontend` — Next.js UI (port 3000)
+- `vitcam-backend` — Camera Server (port 8000)
+- `supabase-db` — PostgreSQL
+- `supabase-studio` — Supabase Studio UI (port 54323)
+- `supabase-storage` — Supabase Storage API
+- `supabase-auth` — Supabase Auth (GoTrue)
+
+Check service health:
+
+```bash
+docker compose ps
+docker compose logs -f vitcam-backend
+```
+
+---
+
+### Manual Setup
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/vitcam.git
+cd vitcam
+```
+
+#### 2. Set Up Supabase
+
+**Option A — Supabase Cloud (easiest):**
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Copy your Project URL and anon/service keys from Project Settings → API
+
+**Option B — Self-hosted Supabase:**
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Start local Supabase stack (requires Docker)
+supabase start
+```
+
+Note the output — you'll need the API URL and keys for your `.env` file.
+
+#### 3. Apply Database Migrations
+
+```bash
+cd supabase
+supabase db push
+```
+
+#### 4. Configure Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your Supabase credentials and other settings (see [Configuration](#configuration)).
+
+#### 5. Install Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
+npm run build
+```
 
-# Start development server
+Start with PM2:
+
+```bash
+npm install -g pm2
+pm2 start npm --name vitcam-frontend -- start
+pm2 save
+```
+
+Or for development:
+
+```bash
 npm run dev
 ```
 
-### Add Your First Camera
+#### 6. Install Backend
 
-1. Navigate to the dashboard at `http://localhost:3000`
-2. Log in with default credentials (change immediately!)
-3. Click "Add Camera" and enter your camera's RTSP URL
-4. Configure detection classes and motion settings
-5. Start monitoring!
-
----
-
-## 📚 Documentation
-
-### Architecture
-
-VitCam follows a clean, microservices-inspired architecture:
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Frontend  │────▶│   Backend    │────▶│   Database  │
-│  (Next.js)  │     │  (FastAPI)   │     │ (PostgreSQL)│
-└─────────────┘     └──────────────┘     └─────────────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │   Storage    │
-                    │  (Supabase)  │
-                    └──────────────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │  AI Models   │
-                    │  (RT-DETR)   │
-                    └──────────────┘
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Core Components
+Start with PM2:
 
-- **WebRTC Server** - Handles real-time video streaming with TURN/STUN support
-- **Detection Engine** - Processes frames using RT-DETR/RF-DETR models
-- **Analytics Pipeline** - Aggregates and analyzes detection data
-- **Agentic AI System** - Multi-agent workflow for intelligent security analysis
-- **Storage Manager** - Handles video recordings and detection snapshots
-- **API Gateway** - RESTful API with authentication and rate limiting
+```bash
+pm2 start "python main.py" --name vitcam-backend --interpreter python
+pm2 save
+```
 
-### Key Technologies
+Or directly:
 
-| Component | Technology |
-|-----------|-----------|
-| Backend | FastAPI, Python 3.11+ |
-| Frontend | Next.js 14, React, TypeScript |
-| Database | PostgreSQL 15+ |
-| Storage | Supabase Storage |
-| AI Models | RT-DETR, RF-DETR, DeepSORT |
-| Streaming | WebRTC, MediaMTX |
-| Containerization | Docker, Docker Compose |
+```bash
+python main.py
+```
 
 ---
 
-## 🎨 Screenshots
+## Configuration
 
-<div align="center">
+All configuration is managed via the `.env` file in the project root. Copy `.env.example` to get started:
 
-### Dashboard Overview
-![Dashboard](docs/images/dashboard.png)
+```bash
+cp .env.example .env
+```
 
-### Live Camera View
-![Live View](docs/images/live-view.png)
-
-### Analytics & Insights
-![Analytics](docs/images/analytics.png)
-
-### Detection Timeline
-![Timeline](docs/images/timeline.png)
-
-</div>
-
----
-
-## 🔧 Configuration
-
-### Environment Variables - Privacy First
-
-Create a `.env` file in the root directory. **For maximum privacy, use local storage:**
+### Key Environment Variables
 
 ```env
-# Database (runs locally on your server)
-DATABASE_URL=postgresql://user:password@localhost:5432/vitcam
+# ─── Supabase ───────────────────────────────────────────
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Storage - Choose your level of privacy
-# Option 1: FULLY LOCAL (Maximum Privacy - Recommended)
-STORAGE_BACKEND=local
-LOCAL_STORAGE_PATH=/var/vitcam/storage
+# ─── Backend ────────────────────────────────────────────
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
 
-# Option 2: Self-hosted Supabase (You control the server)
-STORAGE_BACKEND=supabase
-SUPABASE_URL=your_self_hosted_supabase_url
-SUPABASE_KEY=your_supabase_anon_key
+# ─── AI Inference ───────────────────────────────────────
+# Path to your RF-DETR model weights (PyTorch .pth)
+DETECTION_MODEL_PATH=models/rfdetr_person.pth
 
-# Authentication (Local only - no external auth providers)
-JWT_SECRET=your_secret_key_here
-JWT_ALGORITHM=HS256
-SESSION_TIMEOUT=3600
-
-# AI Models (runs 100% locally on your hardware)
-DETECTION_MODEL=rtdetr_r50vd
-DETECTION_CONFIDENCE=0.5
-TRACKING_ENABLED=true
-MODEL_CACHE_PATH=/var/vitcam/models  # Models stored locally
-
-# Privacy Settings
-TELEMETRY_ENABLED=false  # Always false - we don't collect data
-EXTERNAL_CONNECTIONS=false  # Block all external connections
-ALLOW_REMOTE_ACCESS=false  # Enable only if you want VPN/remote access
-
-# Storage & Retention (you control it all)
-VIDEO_RETENTION_DAYS=30  # Or forever - your choice
-AUTO_DELETE_ENABLED=true  # Automatic cleanup to save space
-ENCRYPTION_ENABLED=true
-ENCRYPTION_KEY_PATH=/var/vitcam/keys/encryption.key
-
-# Network Settings (private network recommended)
-WEBRTC_PORT=8554
-BIND_ADDRESS=127.0.0.1  # Localhost only for maximum privacy
-# BIND_ADDRESS=0.0.0.0  # Use this if you want LAN access
-
-# Optional: Secure Remote Access (via VPN/Tailscale)
-# TURN_SERVER=turn:your-private-turn-server.com:3478
+# ─── Recording ──────────────────────────────────────────
+RECORDING_MODE=motion          # 'motion' or 'continuous'
+RECORDING_RETENTION_DAYS=30    # Auto-delete clips older than N days
 ```
 
 ### Camera Configuration
 
-Cameras can be configured via the dashboard UI or API:
+Cameras are configured through the VitCam UI under **Settings → Cameras**. Each camera supports:
 
-```json
-{
-  "name": "Front Door Camera",
-  "rtsp_url": "rtsp://camera-ip:554/stream",
-  "detection_classes": ["person", "car", "dog"],
-  "motion_sensitivity": 0.7,
-  "recording_enabled": true,
-  "analytics_enabled": true
-}
-```
+- RTSP stream URL
+- Display name and location label
+- Detection model selection
+- Recording mode override
+- Datetime overlay position and format
 
 ---
 
-## 🤝 Contributing
+## Usage
 
-We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+### Accessing the Dashboard
+
+Navigate to `http://localhost:3000` (or your server's IP/domain) and sign in.
+
+### Adding a Camera
+
+1. Go to **Cameras** → **Add Camera**
+2. Enter the RTSP URL (e.g., `rtsp://admin:password@192.168.1.100:554/stream1`)
+3. Choose a detection model
+4. Click **Save** — the stream will appear on the main dashboard within seconds
+
+### Viewing Live Streams
+
+The **Dashboard** page shows all active camera feeds in a grid layout. Click any feed to expand it to full view. Detection bounding boxes and labels are overlaid in real time.
+
+### Reviewing Recordings
+
+Go to **Video Management** to browse recorded clips organized by camera and date. Clips can be previewed, downloaded, or deleted from this view.
+
+### Detection Events
+
+The **Events** page shows a chronological log of all detection events with:
+
+- Timestamp and camera source
+- Detected object class and confidence score
+- Snapshot thumbnail
+- Bounding box coordinates
+
+### Analytics
+
+The **Analytics** dashboard shows:
+
+- Detection counts over time (hourly, daily, weekly views)
+- Object class breakdown (pie/bar charts)
+- Per-camera activity heatmaps
+- Recording storage usage
+
+---
+
+## AI Models
+
+VitCam uses RF-DETR for object detection, with model weights stored as PyTorch `.pth` checkpoints in the `models/` directory.
+
+> **Pre-trained models are available in VitCam Pro.** The community edition is BYOM (Bring Your Own Model) — you supply your own trained `.pth` weights. See the [Fine-Tuning](#fine-tuning-your-own-models) section below to train your own, or purchase a Pro license to access Anthropic's pre-trained surveillance models.
+
+### Bring Your Own Model (Community)
+
+VitCam supports any RF-DETR model saved as a PyTorch `.pth` checkpoint. To use your own:
+
+1. Place your `.pth` file in the `models/` directory
+2. Register it in the UI under **Settings → Models → Add Model**
+3. Assign it to a camera stream
+
+### Pre-Trained Models (Pro)
+
+Pro subscribers get access to ready-to-use pre-trained RF-DETR models via the VitCam model library:
+
+| Model | Classes | Notes |
+|-------|---------|-------|
+| `rfdetr_person.pth` | Person | General person detection and counting |
+| `rfdetr_vehicle.pth` | Car, truck, motorcycle, bus | Vehicle detection and classification |
+| `rfdetr_drone.pth` | Drone / UAV | Aerial drone detection |
+| `rfdetr_helmet.pth` | Safety helmet (on/off) | PPE compliance monitoring |
+
+Available at [vitcam.io](https://vitcam.io) *(coming soon)*.
+
+### Fine-Tuning Your Own Models
+
+See [docs/training.md](docs/training.md) for a guide on fine-tuning RF-DETR on your own dataset using Open Images V7 or custom annotations.
+
+---
+
+## Apple Silicon
+
+Experimental macOS / Apple Silicon support is available using MLX for model inference. This path does not require CUDA.
+
+```bash
+pip install mlx mlx-lm
+```
+
+Set in your `.env`:
+
+```env
+INFERENCE_BACKEND=mlx
+DETECTION_MODEL_PATH=models/rfdetr_person_mlx
+```
+
+Full Apple Silicon setup instructions: [docs/apple-silicon.md](docs/apple-silicon.md)
+
+---
+
+## Open-Core Edition
+
+VitCam follows an **open-core model**:
+
+| Feature | Community (AGPL 3.0) | Pro |
+|---------|---------------------|-----|
+| Live WebRTC streaming | ✅ | ✅ |
+| AI object detection (BYOM — bring your own model) | ✅ | ✅ |
+| Motion & continuous recording | ✅ | ✅ |
+| Analytics dashboard | ✅ | ✅ |
+| Self-hosted deployment | ✅ | ✅ |
+| Multi-camera (unlimited) | ✅ | ✅ |
+| Pre-trained surveillance models | ❌ | ✅ |
+| Specialty AI models (marketplace) | ❌ | ✅ |
+| Advanced alerting & webhooks | ❌ | ✅ |
+| Role-based access control (RBAC) | ❌ | ✅ |
+| Priority support | ❌ | ✅ |
+
+Pro features are available at [vitcam.io](https://vitcam.io) *(coming soon)*.
+
+---
+
+## Contributing
+
+Contributions are welcome! VitCam is maintained by a solo developer, so please read the contributing guidelines before submitting.
 
 ### How to Contribute
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. **Report bugs** — Open an issue with steps to reproduce, your OS/GPU, and relevant logs
+2. **Suggest features** — Open a discussion before submitting a large PR
+3. **Submit fixes** — Small, focused PRs are much easier to review than large ones
 
-### Development Guidelines
-
-- Follow PEP 8 for Python code
-- Use ESLint/Prettier for TypeScript/React code
-- Write tests for new features
-- Update documentation as needed
-- Keep commits atomic and well-described
-
-### Code of Conduct
-
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
-
----
-
-## 🧪 Testing
+### Development Setup
 
 ```bash
-# Backend tests
+# Fork and clone
+git clone https://github.com/your-username/vitcam.git
+cd vitcam
+
+# Backend (Python)
 cd backend
-pytest tests/ -v --cov=app
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
 
-# Frontend tests
-cd frontend
-npm run test
+# Frontend (Next.js)
+cd ../frontend
+npm install
+npm run dev
+```
 
-# End-to-end tests
-npm run test:e2e
+### Code Style
+
+- **Python:** Black + isort (`make lint`)
+- **TypeScript/React:** ESLint + Prettier (`npm run lint`)
+
+### Note on Pull Requests
+
+Due to the complexity of coordinating changes across the AI pipeline, streaming server, and frontend, pull requests are reviewed carefully and may take time. Please open an issue first for any significant feature work — this avoids duplicate effort and helps ensure the change aligns with the project roadmap.
+
+---
+
+## Roadmap
+
+- [ ] AI Model Marketplace (specialty detection models)
+- [ ] Mobile app (iOS / Android)
+- [ ] Edge deployment support (Jetson Nano / Raspberry Pi)
+- [ ] ONVIF camera auto-discovery
+- [ ] Face blurring / privacy masking
+- [ ] Webhook integrations (Slack, Discord, email alerts)
+- [ ] Multi-tenant / RBAC support (Pro)
+- [ ] Cloud-managed option (Pro)
+
+---
+
+## License
+
+VitCam Community Edition is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+This means:
+
+- You are free to use, modify, and distribute this software
+- If you run a modified version as a network service (e.g., a SaaS product), you **must** release your modifications under AGPL-3.0
+- Attribution to the original project is required
+
+See [LICENSE](LICENSE) for the full license text.
+
+```
+VitCam — AI-Powered Camera Surveillance Platform
+Copyright (C) 2024  Sean (VitCam Contributors)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
 ```
 
 ---
 
-## 📦 Deployment Options
+## Acknowledgements
 
-### Self-Hosted Deployment (Recommended for Privacy)
+VitCam is built on top of excellent open-source projects:
 
-**Run on Your Own Hardware:**
-
-1. **Home Server/NAS** - Synology, QNAP, TrueNAS, or custom build
-2. **Mini PC** - Intel NUC, Beelink, or similar
-3. **Raspberry Pi 4/5** - Budget-friendly option for smaller deployments
-4. **Old Desktop/Laptop** - Repurpose existing hardware
-5. **Dedicated Server** - For larger installations
-
-### Production Checklist - Privacy Edition
-
-- [ ] ✅ Change ALL default credentials
-- [ ] 🔒 Configure SSL/TLS certificates (self-signed or Let's Encrypt)
-- [ ] 🔑 Generate strong JWT secrets (min 32 characters)
-- [ ] 🔥 Enable firewall rules (block all external except VPN)
-- [ ] 💾 Configure local backup strategy (YOUR backups, YOUR control)
-- [ ] 📊 Set up local monitoring (no external services)
-- [ ] 🎯 Review and adjust detection sensitivity
-- [ ] 🌐 Configure TURN/STUN servers (use your own, not public ones)
-- [ ] 🚫 Verify TELEMETRY_ENABLED=false
-- [ ] 🔐 Enable encryption for stored videos
-- [ ] 🏠 Set up VPN (Wireguard/Tailscale) for secure remote access
-- [ ] 🔌 Consider network isolation (separate VLAN for cameras)
-
-### Cloud Deployment (For Those Who Need It)
-
-While VitCam is designed for self-hosting, you can deploy to cloud providers if you need off-site backup or don't have local infrastructure. **Remember: Cloud = Someone else's computer.**
-
-- **Self-Hosted Cloud** - Use your own VPS (DigitalOcean, Linode, Hetzner)
-- **AWS** - ECS with RDS and S3 (you control encryption keys)
-- **Google Cloud** - Cloud Run with Cloud SQL (enable customer-managed encryption)
-- **Azure** - Container Instances with Azure Database
-- **Hybrid** - Local processing + encrypted cloud backup
-
-⚠️ **Privacy Note**: If using cloud providers, ensure you:
-- Enable encryption at rest with YOUR keys
-- Use private networking/VPCs
-- Disable cloud provider access to your data
-- Review terms of service carefully
-
-See our [deployment guides](docs/deployment/) for detailed instructions.
+- [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
+- [DeepSORT](https://github.com/nwojke/deep_sort) — Multi-object tracking
+- [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
+- [Supabase](https://supabase.com) — Open-source Firebase alternative
+- [Next.js](https://nextjs.org) — React framework
 
 ---
 
-## 🔐 Security & Privacy
-
-Privacy and security are not just features in VitCam—they're the foundation.
-
-### Privacy by Design
-
-- 🏠 **Self-Hosted Infrastructure** - Your cameras, your server, your data
-- 🔒 **End-to-End Encryption** - Video streams encrypted at rest and in transit
-- 🛡️ **No Third-Party Access** - No one but you can access your footage
-- 🚫 **Zero Telemetry** - No usage tracking, no analytics sent anywhere
-- 📡 **No External Dependencies** - All AI models run locally on your hardware
-- 🔐 **Your Encryption Keys** - You control the keys to your kingdom
-
-### Enterprise-Grade Security
-
-- 🔒 JWT-based authentication with refresh tokens
-- 🛡️ Role-based access control (RBAC)
-- 🔑 Configurable password policies
-- 🚫 SQL injection protection via ORM
-- 📝 Comprehensive audit logging (stored locally)
-- 🔄 Regular security updates from the community
-- 🌐 Optional SSL/TLS for web interface
-- 🔐 Support for hardware security modules (HSM)
-
-### Network Isolation
-
-- ✅ Can run on **air-gapped networks** (no internet required)
-- ✅ VLAN support for camera network isolation
-- ✅ VPN/Tailscale integration for secure remote access
-- ✅ No cloud accounts, no external authentication services
-
-### Reporting Vulnerabilities
-
-Found a security issue? We take security seriously. Please email security@vitcam.io or report via GitHub Security Advisories.
-
-**We do NOT:**
-- Send your data to external servers
-- Require cloud accounts or subscriptions
-- Use third-party analytics or tracking
-- Have backdoors or hidden access methods
-
----
-
-## 📊 Performance
-
-VitCam is designed for efficiency:
-
-- **Low Latency** - Sub-second video streaming with WebRTC
-- **Efficient Detection** - Optimized RT-DETR inference (~30-60 FPS on GPU)
-- **Scalable Storage** - Handle millions of detection events
-- **Resource Management** - Configurable resource limits per camera
-- **Batch Processing** - Efficient bulk operations for analytics
-
-### Benchmarks
-
-| Metric | Performance |
-|--------|-------------|
-| Streaming Latency | <500ms |
-| Detection Speed (GPU) | 30-60 FPS |
-| Detection Speed (CPU) | 5-10 FPS |
-| Max Concurrent Cameras | 100+ (hardware dependent) |
-| Storage Efficiency | ~1GB per camera per day |
-
----
-
-## 🗺️ Roadmap
-
-### Current Version (v1.0)
-- ✅ Real-time object detection
-- ✅ WebRTC streaming
-- ✅ Multi-agent AI workflow
-- ✅ Cloud storage integration
-- ✅ Analytics dashboard
-
-### Upcoming Features
-- 🔲 Mobile apps (iOS/Android)
-- 🔲 Facial recognition (opt-in)
-- 🔲 License plate recognition
-- 🔲 Advanced anomaly detection
-- 🔲 Integration with home automation platforms
-- 🔲 Custom model training interface
-- 🔲 Multi-tenant support
-
----
-
-## 💬 Community & Support
-
-- **Documentation**: [docs.vitcam.io](https://docs.vitcam.io)
-- **Discord**: [Join our community](https://discord.gg/vitcam)
-- **Forum**: [community.vitcam.io](https://community.vitcam.io)
-- **Email**: support@vitcam.io
-
-### Get Help
-
-- 📖 Check the [documentation](docs/)
-- 💬 Ask questions on [Discord](https://discord.gg/vitcam)
-- 🐛 Report bugs via [GitHub Issues](https://github.com/yourusername/vitcam/issues)
-- 💡 Request features in [Discussions](https://github.com/yourusername/vitcam/discussions)
-
----
-
-## ❓ Frequently Asked Questions
-
-### Privacy & Security
-
-**Q: Does VitCam send any data to external servers?**  
-A: **No, never.** VitCam runs entirely on your infrastructure. There's no telemetry, no phone-home, no analytics. Your video data never leaves your server unless you explicitly configure cloud storage or remote access.
-
-**Q: Can you or anyone else access my cameras?**  
-A: **Absolutely not.** We have no access to your system. VitCam has no cloud component, no central servers, and no backdoors. It's your hardware, your network, your data.
-
-**Q: How is this different from Ring/Nest/Arlo?**  
-A: Those services store your footage on their servers, require monthly subscriptions, and have legal obligations to share footage with authorities. VitCam keeps everything local, costs nothing monthly, and only you control access.
-
-**Q: Can I run VitCam without an internet connection?**  
-A: **Yes!** VitCam can run completely air-gapped. Internet is only needed for initial setup (to download Docker images) and optional remote access via VPN.
-
-**Q: Do I need a powerful server?**  
-A: It depends on your setup. A Raspberry Pi 4 can handle 2-4 cameras with CPU-only detection. For GPU-accelerated AI detection and more cameras, consider a mini PC with NVIDIA GPU or a dedicated server.
-
-### Open Source
-
-**Q: Is VitCam really 100% open source?**  
-A: **Yes!** Every line of code is available on GitHub under the Apache 2.0 license. No proprietary components, no closed-source binaries, no hidden code.
-
-**Q: Can I modify and sell VitCam?**  
-A: **Yes.** The Apache 2.0 license allows commercial use. You can modify it, sell it, or use it in your business without restrictions. You must include the original license notice and state any significant changes made.
-
-**Q: What if VitCam shuts down?**  
-A: It can't! It's open source and self-hosted. Even if the project stopped development, your installation keeps working forever. The code is yours to maintain and develop.
-
-**Q: Will you change the license or add paid features?**  
-A: **No.** VitCam will always be Apache 2.0 licensed and free. We're committed to keeping it open source forever. No bait-and-switch.
-
-**Q: What about patents?**  
-A: Apache 2.0 includes an explicit patent grant, which means contributors cannot sue you for patent infringement for using their contributions. This provides stronger legal protection than permissive licenses without patent clauses.
-
-### Technical
-
-**Q: What cameras are supported?**  
-A: Any camera with RTSP stream support. This includes most IP cameras from Hikvision, Dahua, Amcrest, Reolink, and many others. USB cameras also work with a bit of configuration.
-
-**Q: How accurate is the AI detection?**  
-A: VitCam uses RT-DETR, a state-of-the-art detection model with 80+ object classes. Accuracy depends on your use case, but it generally achieves 85-95% accuracy for common objects like people, vehicles, and animals.
-
-**Q: Can I use my own AI models?**  
-A: Yes! VitCam's architecture supports custom models. You can train your own or use other pre-trained models compatible with PyTorch.
-
-**Q: How much storage do I need?**  
-A: Roughly 1-2GB per camera per day with motion-triggered recording. Continuous recording needs 10-50GB per camera per day depending on resolution. You control retention policies.
-
----
-
-## 📄 License
-
-VitCam is open-source software licensed under the [Apache License 2.0](LICENSE).
-
-### Apache 2.0 Key Points
-
-✅ **Commercial Use** - Use VitCam in commercial projects  
-✅ **Modification** - Modify and distribute modified versions  
-✅ **Distribution** - Distribute original or modified versions  
-✅ **Patent Grant** - Explicit patent license from contributors  
-✅ **Private Use** - Use privately without disclosure  
-
-⚠️ **Requirements:**
-- Include original copyright notice
-- Include copy of Apache 2.0 license
-- State significant changes made
-- Include NOTICE file if provided
-
-🛡️ **Patent Protection:**
-Apache 2.0 includes an explicit patent grant, protecting you from patent litigation by contributors.
-
-```
-                                 Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
-
-   Copyright 2024 VitCam Contributors
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-```
-
-**Full license text:** [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
-
----
-
-## 🙏 Acknowledgments
-
-VitCam is built on the shoulders of giants. Special thanks to:
-
-- **RT-DETR** - For the incredible real-time detection model
-- **FastAPI** - For the blazing-fast Python framework
-- **Next.js** - For the amazing React framework
-- **Supabase** - For the excellent backend-as-a-service platform
-- **MediaMTX** - For reliable RTSP/WebRTC streaming
-- **The Open Source Community** - For countless libraries and inspiration
-
----
-
-## 📈 Stats
-
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/vitcam?style=social)](https://github.com/yourusername/vitcam/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/yourusername/vitcam?style=social)](https://github.com/yourusername/vitcam/network/members)
-[![GitHub watchers](https://img.shields.io/github/watchers/yourusername/vitcam?style=social)](https://github.com/yourusername/vitcam/watchers)
-
----
-
-<div align="center">
-
-**[⬆ back to top](#vitcam)**
-
----
-
-### 🔒 Privacy-First | 📖 100% Open Source | 🏠 Fully Self-Hosted
-
-**No Cloud • No Subscriptions • No Data Mining • No Compromises**
-
-Made with ❤️ by privacy advocates and open source enthusiasts
-
-Your cameras. Your data. Your control. Forever.
-
----
-
-[Website](https://vitcam.io) • [Documentation](https://docs.vitcam.io) • [GitHub](https://github.com/yourusername/vitcam) • [Community](https://discord.gg/vitcam)
-
-*VitCam: Because your security footage shouldn't be someone else's data*
-
-</div>
-ash
-git clone https://github.com/your-username/project-name.git
+*Made with ❤️ in the Philippines*
