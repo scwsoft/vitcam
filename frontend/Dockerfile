@@ -6,12 +6,12 @@ WORKDIR /usr/app
 # Install PM2 globally
 RUN npm install --global pm2
 
-# Copy "package.json" and "package-lock.json" before other files
-# Utilise Docker cache to save re-installing dependencies if unchanged
+# Copy package files first (layer cache)
 COPY ./package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install ALL dependencies (not just production)
+# next, react etc. are needed at runtime for next start
+RUN npm install
 
 # Copy all files
 COPY ./ ./
@@ -23,8 +23,7 @@ RUN npm run build
 EXPOSE 3000
 
 # Run container as non-root (unprivileged) user
-# The "node" user is provided in the Node.js Alpine base image
 USER node
 
-# Launch app with PM2
-CMD [ "pm2-runtime", "start", "npm", "--", "start" ]
+# Launch with PM2, explicitly bind Next.js to 0.0.0.0
+CMD ["pm2-runtime", "start", "npm", "--", "start"]

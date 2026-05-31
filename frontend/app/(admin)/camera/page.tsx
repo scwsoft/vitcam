@@ -12,7 +12,7 @@ export default function CameraManagementPage() {
   const { cameras, loading, deleteCamera } = useCameras()
   const { user, loading: authLoading, error: authError } = useAuth();
 
-  const handleAddCamera = () => {
+  const handleAddCamera = () => { 
     router.push('/camera/add')
   }
 
@@ -31,7 +31,7 @@ export default function CameraManagementPage() {
     return <LoadingState />
   }
 
-  return  user ? (
+  return  !authError ? (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-700">
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">

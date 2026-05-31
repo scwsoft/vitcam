@@ -247,9 +247,14 @@ COCO_CLASS_NAMES = {
 #      6:"Vehicle"
 # }
 
+# CUSTOM_CLASS_NAMES = {
+#      1:"Helmet",
+#      2:"No Helmet"
+# }
+
 CUSTOM_CLASS_NAMES = {
-     1:"Helmet",
-     2:"No Helmet"
+     1:"Drone",
+    
 }
 
 # Comprehensive bitrate mapping based on resolution and codec

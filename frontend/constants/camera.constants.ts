@@ -84,13 +84,22 @@ export const DETECTION_CLASSES = {
     90: "toothbrush"
 } as const
 
+// export const CUSTOM_DETECTION_CLASSES = {
+//      1:"Accident",
+//      2:"Mild Accident",
+//      3:"Moderate Accident",
+//      4:"No Accident",
+//      5:"Severe Accident",
+//      6:"Vehicle"
+// } as const
+
+// export const CUSTOM_DETECTION_CLASSES = {
+//      1:"With Helmet",
+//      2:"Without Helmet"
+// } as const
+
 export const CUSTOM_DETECTION_CLASSES = {
-     1:"Accident",
-     2:"Mild Accident",
-     3:"Moderate Accident",
-     4:"No Accident",
-     5:"Severe Accident",
-     6:"Vehicle"
+     1:"Drone",
 } as const
 
 export const INITIAL_FORM_DATA: CameraFormData = {
