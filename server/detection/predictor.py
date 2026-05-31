@@ -319,15 +319,9 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         try:
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
-           
-            if self.camera_config.modelsize =="Edge":
-                
-              result = self.model(converted_image)[0]
-              detections = sv.Detections.from_ultralytics(result)
-
-            else : detections = self.model.predict(
+      
+            detections = self.model.predict(
              converted_image, threshold=self.confidence_threshold
-            
             )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
@@ -336,34 +330,6 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     np.isin(detections.class_id, list(self.detection_classes))
                 ]
             detections = detections[detections.confidence >= self.confidence_threshold]
-
-            # # ── 3. Degenerate-box filter (w/h > 2 px) ────────────────────────
-            # if len(detections) > 0:
-            #     boxes = detections.xyxy
-            #     valid = (
-            #         (boxes[:, 2] - boxes[:, 0] > 2) &
-            #         (boxes[:, 3] - boxes[:, 1] > 2)
-            #     )
-            #     detections = detections[valid]
-
-            # # ── 4. Class-aware NMS ────────────────────────────────────────────
-            # if len(detections) > 0:
-            #     detections = self._class_aware_nms(
-            #         detections, iou_threshold=self.NMS_IOU_THRESHOLD
-            #     )
-
-            # ── 5. Annotate frame using MODEL detections ──────────────────────
-            #   Labels and boxes come entirely from the model; the tracker is
-            #   not consulted here at all.
-            # labels          = self._build_labels(detections)
-            # annotated_frame = frame.copy()
-            # annotated_frame = self.annotator.annotate(
-            #     scene=annotated_frame, detections=detections
-            # )
-            # annotated_frame = self.label_annotator.annotate(
-            #     scene=annotated_frame, detections=detections, labels=labels
-            # )
-
 
             labels = []
             for class_id, confidence in zip(detections.class_id, detections.confidence):

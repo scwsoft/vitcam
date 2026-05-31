@@ -13,7 +13,7 @@ class Settings:
     SUPABASE_URL = os.getenv("SUPABASE_URL", "your-supabase-url")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-supabase-key")
     SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "vitcam-recordings")
-     # Model Configuration - Small, Meduim, Large, Edge
+     # Model Configuration - Small, Meduim, Large
     MODEL_SIZE= os.getenv("MODEL_SIZE")
     MODEL_CHECKPOINT_PATH = os.getenv("MODEL_CHECKPOINT_PATH")
     WEBRTC_STUN_SERVERS = os.getenv("WEBRTC_STUN_SERVERS")

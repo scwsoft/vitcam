@@ -15,9 +15,10 @@ interface CameraFormFieldsProps {
   formData: CameraFormData
   errors: CameraFormErrors
   onUpdate: (field: keyof CameraFormData, value: any) => void
+  isCustomModel?: boolean
 }
 
-export function CameraFormFields({ formData, errors, onUpdate }: CameraFormFieldsProps) {
+export function CameraFormFields({ formData, errors, onUpdate, isCustomModel = false }: CameraFormFieldsProps) {
   return (
     <div className="space-y-6">
       {/* Basic Information */}

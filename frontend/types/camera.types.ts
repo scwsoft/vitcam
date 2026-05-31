@@ -52,5 +52,5 @@ export interface CameraFormErrors {
 export type CameraType = 'RTSP' | 'HTTP' | 'Youtube Live'
 export type RecordingType = 'continuous' | 'motion' | 'none'
 export type EncoderType = 'h264' | 'h265' | 'mjpeg' | 'vp8' | 'vp9'
-export type ModelSize = 'Large' | 'Medium' | 'Small' | 'Nano' | 'Edge'
+export type ModelSize = 'Large' | 'Medium' | 'Small' | 'Nano' 
 export type DetectionType = 'BoundingBox' | 'Segmentation'

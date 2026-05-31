@@ -60,6 +60,11 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
           newData.odclasses = getDefaultClasses(value)
         }
 
+        // Custom model does not support Segmentation — fall back to BoundingBox
+        if (field === 'modelsize' && value === 'Custom' && prev.detectiontype === 'Segmentation') {
+          newData.detectiontype = 'BoundingBox'
+        }
+
         return newData
       })
 
@@ -121,6 +126,8 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
 
     if (!formData.detectiontype) {
       newErrors.detectiontype = 'Detection type is required'
+    } else if (formData.modelsize === 'Custom' && formData.detectiontype === 'Segmentation') {
+      newErrors.detectiontype = 'Segmentation is not supported with the Custom model'
     }
 
     if (formData.is_detection) {
@@ -165,6 +172,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
     formData,
     errors,
     submitting,
+    isCustomModel: formData.modelsize === 'Custom',
     updateField,
     handleSubmit,
     resetForm,

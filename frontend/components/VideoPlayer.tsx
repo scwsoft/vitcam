@@ -223,7 +223,6 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
             setIsCurrentlyDisconnected(true);
           }
         }
-        // ✅ FIXED: Don't kill stream on checking/connected
       });
 
       peerConnection.current.ontrack = (event) => {
@@ -253,7 +252,6 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
     }
   };
 
-  // ✅ CRITICAL: Empty dependency array - only connect once!
   useEffect(() => {
     console.log(`[${Name}] Connecting to WebSocket:`, serverName);
     
@@ -302,7 +300,7 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
       
       cleanupPeerConnection();
     };
-  }, []); // ✅ Empty array!
+  }, []);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -356,7 +354,6 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
       setReset(false);
       setRemoteStream(false);
       setStateConnection("stopped");
-
     }
   };
 
@@ -642,16 +639,16 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
       </div>
       
       {/* Control Panel */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 px-2 py-1.5 sm:px-3 sm:py-2">
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 px-3 py-2 sm:px-4 sm:py-3">
         {/* Camera Name and Status */}
-        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-          <h3 className="text-ms font-medium text-gray-800 dark:text-white truncate">
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <h3 className="text-sm font-medium text-gray-800 dark:text-white truncate">
             {Name}
           </h3>
           
           {/* Status Indicator */}
-          <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded-full shadow-sm border-2 border-gray-200 dark:border-gray-600">
-            <div className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${
+          <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 px-2 py-1 rounded-full shadow-sm border-2 border-gray-200 dark:border-gray-600">
+            <div className={`w-2 h-2 rounded-full ${
               isRemoteStream ? 'bg-green-500 animate-pulse' : 
               (stateConnection === "connecting" || isReset) ? 'bg-yellow-500 animate-pulse' : 
               'bg-red-500'
@@ -665,45 +662,48 @@ export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName
         </div>
         
         {/* Control Buttons */}
-        <div className="flex items-center justify-center space-x-1.5 sm:space-x-2">
+        <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+          {/* Stop Button */}
           <button
             onClick={stop}
             disabled={!isRemoteStream && !connected && stateConnection !== "connecting" && stateConnection !== "restarting"}
-            className="group bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-1.5 sm:p-2 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
+            className="group bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-3 sm:p-3.5 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
             title={(!isRemoteStream && !connected) ? "Stream Already Stopped" : "Stop Stream"}
           >
-            <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:scale-110 transition-transform" />
+            <Square className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
           </button>
           
+          {/* Start / Reconnect Button */}
           <button
             onClick={startVideo}
             disabled={isRemoteStream || stateConnection === "connecting" || stateConnection === "restarting" || isReset}
-            className="group bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-1.5 sm:p-2 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
+            className="group bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-3 sm:p-3.5 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
             title={isRemoteStream ? "Stream Already Playing" : "Start/Reconnect Stream"}
           >
-            <PlayIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:scale-110 transition-transform" />
+            <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
           </button>
 
-          {/* Reset View Button */}
+          {/* Reset View Button — only shown when zoomed/panned */}
           {(zoomLevel !== 1 || panPosition.x !== 0 || panPosition.y !== 0) && (
             <button
               onClick={resetView}
-              className="group bg-blue-500 hover:bg-blue-600 text-white p-1.5 sm:p-2 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
+              className="group bg-blue-500 hover:bg-blue-600 text-white p-3 sm:p-3.5 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
               title="Reset Zoom & Pan"
             >
-              <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:scale-110 transition-transform" />
+              <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
             </button>
           )}
           
+          {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="group bg-purple-500 hover:bg-purple-600 text-white p-1.5 sm:p-2 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
+            className="group bg-purple-500 hover:bg-purple-600 text-white p-3 sm:p-3.5 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
             title="Toggle Fullscreen"
           >
             {isFullscreen ? (
-              <Minimize className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:scale-110 transition-transform" />
+              <Minimize className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
             ) : (
-              <Maximize className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:scale-110 transition-transform" />
+              <Maximize className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
             )}
           </button>
         </div>

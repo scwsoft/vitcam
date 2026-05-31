@@ -69,15 +69,6 @@ class CameraPredictorFactory:
                 model = RFDETRNano(device=device)
                 model.optimize_for_inference(compile=False) 
             
-            elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'BoundingBox':  
-                model = YOLO("yolo26n_float32.tflite")
-                device = None
-            
-            elif  camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':  
-                model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
-                model = YOLO("yolo26n_float32.tflite")
-                device = None
-
             elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
                 model =  RFDETRBase(device=device,
                           pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
@@ -100,10 +91,6 @@ class CameraPredictorFactory:
             elif camera_config.modelsize  == "Nano" and camera_config.detectiontype == 'Segmentation': 
                 model = RFDETRSegNano(device=device)
                 model.optimize_for_inference(compile=False) 
-            
-            elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'Segmentation':  
-                model = YOLO("yolo26n_float32.tflite")
-                device = None
             
             elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'Segmentation':  
                 model =  RFDETRSegMedium(device=device,

@@ -1,313 +1,569 @@
-/**
- * ImprovedVideoPlayer Component
- * Full-screen video player with controls
- */
+"use client";
+import { useState, useRef, useEffect } from 'react';
+import { Play, Pause, Square, RotateCcw, Maximize, Minimize, VideoOff, CircleDot, Circle, PlayIcon } from 'lucide-react';
+import {ICameraProps} from "@types/CameraType";
 
-'use client';
-
-import React, { useRef, useEffect, useState } from 'react';
-import { X, Play, Pause, Volume2, VolumeX, Maximize, ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import type { VideoFile } from '@/types/video.types';
-
-interface VideoPlayerProps {
-  video: VideoFile;
-  onClose: () => void;
-  onPrevious?: () => void;
-  onNext?: () => void;
-  hasPrevious?: boolean;
-  hasNext?: boolean;
+interface VideoPlayerProps extends ICameraProps {
+  stunServers?: string[];
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  video,
-  onClose,
-  onPrevious,
-  onNext,
-  hasPrevious = false,
-  hasNext = false,
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export default function VideoPlayer({ Name, Url, IsRealTimeDetection, ServerName, stunServers}: VideoPlayerProps){
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [showControls, setShowControls] = useState(true);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [showControls, setShowControls] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isReset, setReset] = useState(false);
+  const [isDetection, setDetection] = useState(IsRealTimeDetection);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [lastPanPosition, setLastPanPosition] = useState({ x: 0, y: 0 });
+  const [connected, setConnected] = useState(false);
+  const [isRemoteStream, setRemoteStream] = useState(false);
+  const [stateConnection, setStateConnection] = useState("");
+  const [serverName, setServerName] = useState(ServerName);
+
+  // Auto-reconnect feature states
+  const [autoReconnectEnabled, setAutoReconnectEnabled] = useState(true);
+  const [hasHadSuccessfulConnection, setHasHadSuccessfulConnection] = useState(false);
+  const [isCurrentlyDisconnected, setIsCurrentlyDisconnected] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const ws = useRef<WebSocket | null>(null);
+  const videoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const sendToServer = (data: any) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      try {
+        ws.current.send(JSON.stringify(data));
+        console.log(`[${Name}] Sent to server:`, data.type, data.action);
+      } catch (error) {
+        console.log(`[${Name}] Error sending to server:`, error);
+      }
+    }
+  };
+
+  const cleanupPeerConnection = () => {
+    if (peerConnection.current) {
+      console.log(`[${Name}] Cleaning up peer connection`);
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    
+    if (videoTimeoutRef.current) {
+      clearTimeout(videoTimeoutRef.current);
+      videoTimeoutRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const handleConnectionFailure = () => {
+    console.log(`[${Name}] Handling connection failure`);
+    
+    setConnected(false);
+    setRemoteStream(false);
+    setReset(false);
+    setStateConnection("failed");
+    
+    cleanupPeerConnection();
+    
+    if (autoReconnectEnabled && hasHadSuccessfulConnection && reconnectAttempts < 5) {
+      const delay = Math.min(5000 * Math.pow(2, reconnectAttempts), 30000);
+      console.log(`[${Name}] Auto-reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/5)`);
+      
+      reconnectTimeoutRef.current = setTimeout(() => {
+        setReconnectAttempts(prev => prev + 1);
+        startVideo();
+      }, delay);
+    } else {
+      setIsCurrentlyDisconnected(true);
+    }
+  };
+
+  const createAndSendOffer = async (rtsp_url: string) => {
+    try {
+      if (!peerConnection.current) {
+        console.log(`[${Name}] No peer connection for offer`);
+        return;
+      }
+      
+      console.log(`[${Name}] Creating offer...`);
+      const offer = await peerConnection.current.createOffer();
+      await peerConnection.current.setLocalDescription(offer);
+
+      sendToServer({
+        type: 'offer',
+        sdp: peerConnection.current.localDescription,
+        rtsp_url: rtsp_url,
+        is_detect: isDetection,
+        screen_type: "full_screen",
+      });
+
+      videoTimeoutRef.current = setTimeout(() => {
+        if (!isRemoteStream && peerConnection.current) {
+          console.warn(`[${Name}] Video timeout - no feed received after 15s`);
+          handleConnectionFailure();
+        }
+      }, 60000);
+
+    } catch (error) {
+      console.log(`[${Name}] Error creating offer:`, error);
+      handleConnectionFailure();
+    }
+  };
+
+  const handleSignalingMessage = async (message: any) => {
+    try {
+      if (!peerConnection.current) return;
+      
+      if (message.type === 'answer' && message.sdp && peerConnection.current.connectionState !== "closed") {
+        console.log(`[${Name}] Received answer, setting remote description`);
+        await peerConnection.current.setRemoteDescription(
+          new RTCSessionDescription(message.sdp)
+        );
+      } else if (message.type === 'ice_candidate' && message.candidate) {
+        await peerConnection.current.addIceCandidate(
+          new RTCIceCandidate(message.candidate)
+        );
+      }
+    } catch (error) {
+      console.log(`[${Name}] Error handling signaling message:`, error);
+    }
+  };
+
+  const initConnection = async () => {
+    try {
+      cleanupPeerConnection();
+
+      console.log(`[${Name}] Initializing WebRTC connection...`);
+      
+      const iceServers: RTCIceServer[] = stunServers && stunServers.length > 0
+        ? stunServers.map(url => ({ urls: url }))
+        : [];
+      
+      peerConnection.current = new RTCPeerConnection({ iceServers });
+      peerConnection.current.addTransceiver('video', { direction: 'recvonly' });
+
+      peerConnection.current.onconnectionstatechange = () => {
+        if (!peerConnection.current) return;
+        
+        const state = peerConnection.current.connectionState;
+        console.log(`[${Name}] Connection state:`, state);
+        setStateConnection("connecting");
+        
+        if (state === 'connected') {
+          setConnected(true);
+          setStateConnection("connected");
+          setHasHadSuccessfulConnection(true);
+          setIsCurrentlyDisconnected(false);
+          setReconnectAttempts(0);
+        }
+        else if (['disconnected', 'failed', 'closed'].includes(state)) {
+          setConnected(false);
+          setRemoteStream(false);
+          setReset(false);
+          setStateConnection("closed");
+          
+          if (peerConnection.current) {
+            peerConnection.current.close();
+          }
+          
+          if (state === 'failed') {
+            handleConnectionFailure();
+          } else if (state === 'disconnected') {
+            setTimeout(() => {
+              if (peerConnection.current?.connectionState === 'disconnected') {
+                handleConnectionFailure();
+              }
+            }, 5000);
+          }
+          
+          if (hasHadSuccessfulConnection && state !== 'closed') {
+            setIsCurrentlyDisconnected(true);
+          }
+        }
+        else if (state === 'connecting') {
+          setConnected(false);
+          setStateConnection("connecting");
+        }
+      };
+
+      peerConnection.current.addEventListener("iceconnectionstatechange", () => {
+        if (!peerConnection.current) return;
+        
+        const iceState = peerConnection.current.iceConnectionState;
+        
+        if (iceState === 'failed') {
+          setConnected(false);
+          setRemoteStream(false);
+          setReset(false);
+          if (peerConnection.current) {
+            peerConnection.current.close();
+          }
+          
+          if (hasHadSuccessfulConnection) {
+            setIsCurrentlyDisconnected(true);
+          }
+        }
+      });
+
+      peerConnection.current.ontrack = (event) => {
+        if (videoRef.current && event.streams[0]) {
+          if (videoTimeoutRef.current) {
+            clearTimeout(videoTimeoutRef.current);
+            videoTimeoutRef.current = null;
+          }
+
+          videoRef.current.srcObject = event.streams[0];
+          setIsPlaying(true);
+          setRemoteStream(true);
+          setReset(false);
+          setHasHadSuccessfulConnection(true);
+          setIsCurrentlyDisconnected(false);
+        }
+      };
+
+      createAndSendOffer(Url);
+
+    } catch (error) {
+      console.log(`[${Name}] Error initializing connection:`, error);
+      handleConnectionFailure();
+    }
+  };
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    ws.current = new WebSocket(serverName);
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleDurationChange = () => setDuration(video.duration);
-    const handleEnded = () => setIsPlaying(false);
+    ws.current.onopen = () => {
+      setConnected(true);
+      setTimeout(() => { initConnection(); }, 100);
+    };
 
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('durationchange', handleDurationChange);
-    video.addEventListener('ended', handleEnded);
+    ws.current.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      await handleSignalingMessage(message);
+    };
+
+    ws.current.onerror = (error) => {
+      console.log(`[${Name}] WebSocket error:`, error);
+    };
+
+    ws.current.onclose = () => {
+      setConnected(false);
+      if (hasHadSuccessfulConnection) {
+        setIsCurrentlyDisconnected(true);
+      }
+    };
 
     return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('durationchange', handleDurationChange);
-      video.removeEventListener('ended', handleEnded);
+      if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (ws.current) { ws.current.close(); ws.current = null; }
+      cleanupPeerConnection();
     };
   }, []);
 
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) { videoRef.current.pause(); } else { videoRef.current.play(); }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const stop = () => {
+    try {
+      setReset(false);
+      setRemoteStream(false);
+      setIsCurrentlyDisconnected(true);
+      setReconnectAttempts(0);
+
+      if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = null; }
+      if (peerConnection.current !== null) { peerConnection.current.close(); peerConnection.current = null; }
+      
+      sendToServer({ type: "control", rtsp_url: Url, is_detect: isDetection, action: 'stop' });
+      stopVideo();
+    } catch (error) {
+      console.log(`[${Name}] Error stopping:`, error);
+    }
+  };
+
+  const stopVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+      setIsPlaying(false);
+      setReset(false);
+      setRemoteStream(false);
+      setStateConnection("stopped");
+    }
+  };
+
+  const startVideo = async () => {
+    try {
+      setIsCurrentlyDisconnected(false);
+      if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = null; }
+      if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null; }
+      
+      sendToServer({ type: "control", rtsp_url: Url, is_detect: isDetection, screen_type: "small_screen", action: 'restart' });
+      
+      stopVideo();
+      setZoomLevel(1);
+      setPanPosition({ x: 0, y: 0 });
+      setReset(true);
+      setConnected(false);
+      setRemoteStream(false);
+      setStateConnection("restarting");
+      
+      setTimeout(() => { initConnection(); }, 1000);
+    } catch (error) {
+      console.log(`[${Name}] Error restarting:`, error);
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!videoContainerRef.current) return;
+    const rect = videoContainerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const offsetX = mouseX - centerX;
+    const offsetY = mouseY - centerY;
+    const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoomLevel = Math.max(0.6, Math.min(3, zoomLevel + zoomDelta));
+    if (newZoomLevel !== zoomLevel) {
+      const zoomRatio = newZoomLevel / zoomLevel;
+      const newPanX = panPosition.x * zoomRatio + offsetX * (1 - zoomRatio) * 0.5;
+      const newPanY = panPosition.y * zoomRatio + offsetY * (1 - zoomRatio) * 0.5;
+      const maxPanX = (newZoomLevel - 1) * rect.width / 2;
+      const maxPanY = (newZoomLevel - 1) * rect.height / 2;
+      const boundedPanX = Math.max(-maxPanX, Math.min(newPanX, maxPanX));
+      const boundedPanY = Math.max(-maxPanY, Math.min(newPanY, maxPanY));
+      setZoomLevel(newZoomLevel);
+      setPanPosition({ x: boundedPanX, y: boundedPanY });
+      if (newZoomLevel <= 1) setPanPosition({ x: 0, y: 0 });
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomLevel > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setLastPanPosition(panPosition);
+      if (videoContainerRef.current) videoContainerRef.current.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging && zoomLevel > 1 && videoContainerRef.current) {
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      const rect = videoContainerRef.current.getBoundingClientRect();
+      const maxPanX = (zoomLevel - 1) * rect.width / 2;
+      const maxPanY = (zoomLevel - 1) * rect.height / 2;
+      let newX = Math.max(-maxPanX, Math.min(lastPanPosition.x + deltaX, maxPanX));
+      let newY = Math.max(-maxPanY, Math.min(lastPanPosition.y + deltaY, maxPanY));
+      setPanPosition({ x: newX, y: newY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    if (videoContainerRef.current) videoContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+    if (videoContainerRef.current) videoContainerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+  };
+
+  const resetView = () => { setZoomLevel(1); setPanPosition({ x: 0, y: 0 }); };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!containerRef.current) return;
+      if (!document.fullscreenElement) {
+        const container = containerRef.current;
+        if (container.requestFullscreen) await container.requestFullscreen();
+        else if ((container as any).webkitRequestFullscreen) await (container as any).webkitRequestFullscreen();
+        sendToServer({ type: "control", action: "change_bitrate", rtsp_url: Url, is_detect: isDetection, screen_type: "full_screen" });
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
+        sendToServer({ type: "control", action: "change_bitrate", rtsp_url: Url, is_detect: isDetection, screen_type: "small_screen" });
+      }
+    } catch (error) {
+      console.log("Error toggling fullscreen:", error);
+    }
+  };
+
   useEffect(() => {
-    // Handle keyboard shortcuts
-    const handleKeyPress = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case ' ':
-          e.preventDefault();
-          togglePlayPause();
-          break;
-        case 'Escape':
-          onClose();
-          break;
-        case 'ArrowLeft':
-          if (hasPrevious && onPrevious) onPrevious();
-          break;
-        case 'ArrowRight':
-          if (hasNext && onNext) onNext();
-          break;
-        case 'm':
-          toggleMute();
-          break;
-        case 'f':
-          toggleFullscreen();
-          break;
-      }
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [hasPrevious, hasNext, onPrevious, onNext, onClose]);
-
-  const togglePlayPause = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (isPlaying) {
-      video.pause();
-    } else {
-      video.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.muted = !isMuted;
-    setIsMuted(!isMuted);
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const newVolume = parseFloat(e.target.value);
-    video.volume = newVolume;
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const newTime = parseFloat(e.target.value);
-    video.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
-  const toggleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      video.requestFullscreen();
-    }
-  };
-
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
-    }, 3000);
-  };
-
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = video.publicUrl;
-    link.download = video.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  }, []);
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-      onMouseMove={handleMouseMove}
+      ref={containerRef}
+      className="flex flex-col w-full bg-white dark:bg-gray-900 rounded-lg shadow-md overflow-hidden border-2 border-gray-300 dark:border-gray-600"
     >
-      {/* Video */}
-      <video
-        ref={videoRef}
-        src={video.publicUrl}
-        className="max-w-full max-h-full"
-        onClick={togglePlayPause}
-      />
-
-      {/* Controls Overlay */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/80 transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        {/* Top Bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {hasPrevious && onPrevious && (
-              <button
-                onClick={onPrevious}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Previous video (←)"
-              >
-                <ChevronLeft className="w-6 h-6 text-white" />
-              </button>
-            )}
-            <div className="text-white">
-              <h2 className="text-lg font-semibold">{video.name}</h2>
-              <p className="text-sm text-gray-300">{video.camera}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownload}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              title="Download video"
-            >
-              <Download className="w-5 h-5 text-white" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              title="Close (Esc)"
-            >
-              <X className="w-6 h-6 text-white" />
-            </button>
-          </div>
+      {/* Video Container */}
+      <div className="relative aspect-video bg-black rounded-t-lg overflow-hidden border-b-2 border-gray-300 dark:border-gray-600">
+        <div 
+          ref={videoContainerRef}
+          className="relative w-full h-full"
+          style={{ 
+            cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            overflow: 'hidden'
+          }}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline 
+            className="w-full h-full object-fill transition-transform duration-150 ease-out"
+            style={{ 
+              transform: `scale(${zoomLevel}) translate(${panPosition.x / zoomLevel}px, ${panPosition.y / zoomLevel}px)`
+            }}
+          />
         </div>
-
-        {/* Center Play Button */}
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              onClick={togglePlayPause}
-              className="p-6 bg-white/20 hover:bg-white/30 rounded-full transition-colors backdrop-blur-sm"
-            >
-              <Play className="w-16 h-16 text-white" fill="white" />
-            </button>
+        
+        {/* Zoom indicator */}
+        {zoomLevel !== 1 && (
+          <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+            {Math.round(zoomLevel * 100)}%
           </div>
         )}
 
-        {/* Bottom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={handleSeek}
-              className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-            />
-            <div className="flex justify-between text-xs text-white mt-1">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
+        {/* Reconnect attempts indicator */}
+        {reconnectAttempts > 0 && (
+          <div className="absolute top-2 left-2 bg-yellow-600 bg-opacity-80 text-white px-2 py-1 rounded text-xs">
+            Reconnecting... ({reconnectAttempts}/5)
           </div>
+        )}
 
-          {/* Control Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={togglePlayPause}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Play/Pause (Space)"
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 text-white" />
-                ) : (
-                  <Play className="w-6 h-6 text-white" />
-                )}
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleMute}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  title="Mute (M)"
-                >
-                  {isMuted ? (
-                    <VolumeX className="w-5 h-5 text-white" />
-                  ) : (
-                    <Volume2 className="w-5 h-5 text-white" />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {hasNext && onNext && (
-                <button
-                  onClick={onNext}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  title="Next video (→)"
-                >
-                  <ChevronRight className="w-6 h-6 text-white" />
-                </button>
+        {/* No Stream Overlay */}
+        {!isRemoteStream && !isReset && stateConnection !== "connecting" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="text-center">
+              <VideoOff className="text-white opacity-60 mx-auto mb-1 w-6 h-6 sm:w-8 sm:h-8" />
+              <p className="text-white text-xs opacity-80">No Video Stream</p>
+              {stateConnection === "failed" && (
+                <p className="text-red-400 text-xs mt-1">Connection Failed</p>
               )}
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Fullscreen (F)"
-              >
-                <Maximize className="w-5 h-5 text-white" />
-              </button>
             </div>
           </div>
+        )}  
+
+        {/* Loading Overlay */}
+        {(stateConnection === "connecting" || stateConnection === "restarting" || isReset) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="text-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="animate-spin mx-auto mb-1 w-5 h-5 sm:w-6 sm:h-6" fill="#fff" viewBox="0 0 26.349 26.35">
+                <circle cx="13.792" cy="3.082" r="3.082" />
+                <circle cx="13.792" cy="24.501" r="1.849" />
+                <circle cx="6.219" cy="6.218" r="2.774" />
+                <circle cx="21.365" cy="21.363" r="1.541" />
+                <circle cx="3.082" cy="13.792" r="2.465" />
+                <circle cx="24.501" cy="13.791" r="1.232" />
+                <path d="M4.694 19.84a2.155 2.155 0 0 0 0 3.05 2.155 2.155 0 0 0 3.05 0 2.155 2.155 0 0 0 0-3.05 2.146 2.146 0 0 0-3.05 0z" />
+                <circle cx="21.364" cy="6.218" r=".424" />
+              </svg>
+              <p className="text-white text-xs">
+                {stateConnection === "restarting" ? "Restarting..." : "Connecting..."}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Control Panel */}
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 px-3 py-2 sm:px-4 sm:py-3">
+        {/* Camera Name and Status */}
+        <div className="flex items-center justify-between mb-2 sm:mb-2.5">
+          <h3 className="text-ms font-medium text-gray-800 dark:text-white truncate">
+            {Name}
+          </h3>
+          
+          {/* Status Indicator */}
+          <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 px-2 py-1 rounded-full shadow-sm border-2 border-gray-200 dark:border-gray-600">
+            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
+              isRemoteStream ? 'bg-green-500 animate-pulse' : 
+              (stateConnection === "connecting" || isReset) ? 'bg-yellow-500 animate-pulse' : 
+              'bg-red-500'
+            }`}></div>
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {isRemoteStream ? 'Online' : 
+               (stateConnection === "connecting" || isReset) ? 'Connecting' : 
+               'Offline'}
+            </span>
+          </div>
+        </div>
+        
+        {/* Control Buttons */}
+        <div className="flex items-center justify-center space-x-4">
+          <button
+            onClick={stop}
+            disabled={!isRemoteStream && !connected && stateConnection !== "connecting" && stateConnection !== "restarting"}
+            className="group bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-5 rounded-full flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
+            title={(!isRemoteStream && !connected) ? "Stream Already Stopped" : "Stop Stream"}
+          >
+            <Square className="w-10 h-10 group-hover:scale-110 transition-transform" />
+          </button>
+          
+          <button
+            onClick={startVideo}
+            disabled={isRemoteStream || stateConnection === "connecting" || stateConnection === "restarting" || isReset}
+            className="group bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:opacity-50 text-white p-5 rounded-full flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 disabled:hover:scale-100 disabled:hover:shadow-sm"
+            title={isRemoteStream ? "Stream Already Playing" : "Start/Reconnect Stream"}
+          >
+            <PlayIcon className="w-10 h-10 group-hover:scale-110 transition-transform" />
+          </button>
+
+          {/* Reset View Button */}
+          {(zoomLevel !== 1 || panPosition.x !== 0 || panPosition.y !== 0) && (
+            <button
+              onClick={resetView}
+              className="group bg-blue-500 hover:bg-blue-600 text-white p-5 rounded-full flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
+              title="Reset Zoom & Pan"
+            >
+              <RotateCcw className="w-10 h-10 group-hover:scale-110 transition-transform" />
+            </button>
+          )}
+          
+          <button
+            onClick={toggleFullscreen}
+            className="group bg-purple-500 hover:bg-purple-600 text-white p-5 rounded-full flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
+            title="Toggle Fullscreen"
+          >
+            {isFullscreen ? (
+              <Minimize className="w-10 h-10 group-hover:scale-110 transition-transform" />
+            ) : (
+              <Maximize className="w-10 h-10 group-hover:scale-110 transition-transform" />
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
-};
-
-export default VideoPlayer;
+}
