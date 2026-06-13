@@ -2,7 +2,7 @@
 > **Self-hosted, on-premises AI camera surveillance and NVR platform**
  
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/your-username/vitcam)
+[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
  
 **VitCam is a fully local, on-premises AI-powered camera surveillance and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — VitCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
@@ -23,8 +23,7 @@ Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered o
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
-  - [Docker Setup](#docker-setup)
-  - [Manual Setup](#manual-setup)
+  - [Windows Setup (WSL2)](#windows-setup-wsl2)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [AI Models](#ai-models)
@@ -42,7 +41,7 @@ VitCam supports multiple stream input protocols, so it works with a wide range o
 | **RTSP** | IP cameras, NVR/DVR systems (Hikvision, Dahua, Reolink, Amcrest, etc.) | Primary protocol; recommended for on-premises cameras |
 | **HTTP / MJPEG** | Older IP cameras, embedded cameras, some IoT devices | Streams served as a continuous JPEG sequence over HTTP |
 | **YouTube Live** | Public live streams, traffic cams, public surveillance feeds | Useful for testing or monitoring public sources |
-| **USB / Webcam** | Local USB cameras attached to the VitCam host | Accessed directly by the backend |
+| **USB / Local Camera** | Built-in laptop cameras, USB webcams attached to the VitCam host | Referenced by device index using `local:<index>` (e.g. `local:0`) |
 | **ONVIF** | Standard-compliant IP cameras | 🔜 Auto-discovery coming soon |
  
 > ⚠️ **Privacy & legal notice:** When connecting to any public or third-party stream (e.g. YouTube Live or public webcams), ensure you have the right to access and process that feed. VitCam does not condone unauthorized surveillance.
@@ -74,10 +73,22 @@ http://username:password@<camera-ip>:<port>/videostream.cgi
 ```
  
 **YouTube Live:**
- 
+
 ```
 https://www.youtube.com/watch?v=<live-stream-id>
 ```
+
+**USB / Local Camera:**
+
+```
+# Built-in camera or first USB webcam
+local:0
+
+# Second USB camera (if multiple are connected)
+local:1
+```
+
+> On Windows (WSL2), local cameras are accessed via the host. If `local:0` isn't detected, ensure the camera is not in use by another application.
  
 VitCam pulls each stream and processes it locally. For on-premises cameras, no internet access or port forwarding is required.
  
@@ -139,7 +150,7 @@ VitCam is composed of two main services:
  
 **Backend** — The Camera Server (FastAPI + aiortc) handling camera capture, AI inference with RF-DETR, object tracking with DeepSORT, and video recording.
  
-**Supabase** — Used as the primary database (Postgres), file storage (video clips, snapshots), and authentication provider. Can be self-hosted via Supabase's Docker stack or used with Supabase Cloud.
+**Supabase** — Used as the primary database (Postgres), file storage (video clips, snapshots), and authentication provider. Can be self-hosted via the Supabase CLI or used with Supabase Cloud.
  
 ---
  
@@ -149,26 +160,23 @@ VitCam is composed of two main services:
  
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12 |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
 | GPU | Optional — NVIDIA GPU strongly recommended for AI inference |
 | Node.js | 18 or later |
 | Python | 3.10 or later |
-| Docker | 24.0 or later (for Docker-based setup) |
- 
+
 ### Recommended (for AI workloads)
- 
+
 | Component | Recommendation |
 |-----------|----------------|
 | GPU | NVIDIA RTX 3060 or better (e.g., RTX 5060 Ti) |
 | VRAM | 8 GB minimum |
 | CUDA | 12.x |
 | RAM | 16–32 GB |
- 
-> **Apple Silicon / macOS:** Experimental support via MLX inference backend. Docker-based setup is recommended. See [Apple Silicon Notes](#apple-silicon) below.
- 
+
 ---
  
 ## Installation
@@ -179,7 +187,7 @@ The fastest way to get VitCam running on a fresh Ubuntu machine:
  
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/vitcam.git
+git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
  
 # Run the installer script
@@ -190,7 +198,7 @@ chmod +x install.sh
 The installer will:
  
 1. Install system dependencies (Node.js, Python, ffmpeg, libGL, etc.)
-2. Set up a local Supabase instance via Docker
+2. Set up a local Supabase instance
 3. Apply the database schema migrations
 4. Install frontend and backend dependencies
 5. Configure PM2 to manage the frontend and backend processes
@@ -200,166 +208,146 @@ Once complete, open your browser at `http://localhost:3000`.
 Default credentials are printed at the end of the install script. **Change them immediately.**
  
 ---
- 
-### Docker Setup
- 
-If you prefer a fully containerized setup:
- 
-```bash
-git clone https://github.com/your-username/vitcam.git
-cd vitcam
- 
-# Copy and edit environment configuration
-cp .env.example .env
-nano .env
- 
-# Start all services
-docker compose up -d
-```
- 
-Services started by Docker Compose:
- 
-- `vitcam-frontend` — Next.js UI (port 3000)
-- `vitcam-backend` — Camera Server (port 8000)
-- `supabase-db` — PostgreSQL
-- `supabase-studio` — Supabase Studio UI (port 54323)
-- `supabase-storage` — Supabase Storage API
-- `supabase-auth` — Supabase Auth (GoTrue)
-Check service health:
- 
-```bash
-docker compose ps
-docker compose logs -f vitcam-backend
-```
- 
----
- 
-### Manual Setup
- 
-#### 1. Clone the Repository
- 
-```bash
-git clone https://github.com/your-username/vitcam.git
+
+### Windows Setup (WSL2)
+
+VitCam's backend requires a Linux environment for GPU access and system services. On Windows, this is done by running the server inside **WSL2** (Windows Subsystem for Linux) while the frontend and Supabase CLI run natively in Windows PowerShell or Command Prompt.
+
+> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04, and an NVIDIA GPU with [CUDA drivers for WSL2](https://developer.nvidia.com/cuda/wsl).
+
+#### Step 1 — Clone the Repository (Windows)
+
+Open **PowerShell** or **Command Prompt** and run:
+
+```powershell
+git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
 ```
- 
-#### 2. Set Up Supabase
- 
-**Option A — Supabase Cloud (easiest):**
- 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Copy your Project URL and anon/service keys from Project Settings → API
-**Option B — Self-hosted Supabase:**
- 
-```bash
-# Install Supabase CLI
+
+#### Step 2 — Set Up Supabase (Windows)
+
+Install the Supabase CLI globally and start the local Supabase stack:
+
+```powershell
 npm install -g supabase
- 
-# Start local Supabase stack (requires Docker)
 supabase start
 ```
- 
-Note the output — you'll need the API URL and keys for your `.env` file.
- 
-#### 3. Apply Database Migrations
- 
+
+> Supabase requires Docker Desktop. Make sure it's running before this step.
+
+Once started, Supabase will print your local API URL and keys — copy these into your `.env` file (see [Configuration](#configuration)).
+
+#### Step 3 — Apply the Database Schema (Windows)
+
+1. Open **Supabase Studio** at `http://localhost:54323`
+2. Navigate to the **SQL Editor**
+3. Open `dbschema.sql` from the root of your cloned `vitcam` directory
+4. Paste its contents into the editor and click **Run**
+
+#### Step 4 — Create the First User (Windows)
+
+1. In Supabase Studio, go to **Authentication → Users**
+2. Click **Add User**, enter your email and password
+3. Set **Auto Confirm** to on so the account is immediately active
+
+#### Step 5 — Install and Start the Backend (WSL2)
+
+Open a **WSL2 terminal** (e.g. Ubuntu from the Start Menu or `wsl` in PowerShell). Navigate to your VitCam directory — your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.:
+
 ```bash
-cd supabase
-supabase db push
+cd /mnt/c/Users/<YourUser>/path/to/vitcam
 ```
- 
-#### 4. Configure Environment Variables
- 
+
+Run the server installer with sudo:
+
 ```bash
-cp .env.example .env
+sudo ./install-vitcam-server.sh
 ```
- 
-Edit `.env` and fill in your Supabase credentials and other settings (see [Configuration](#configuration)).
- 
-#### 5. Install Frontend
- 
+
+Once installed, start and monitor the VitCam backend service:
+
 ```bash
+sudo systemctl start vitcam
+journalctl -u vitcam -f
+```
+
+> Leave this terminal open to watch live logs. Press `Ctrl+C` to stop following logs — the service itself will keep running.
+
+#### Step 6 — Build and Start the Frontend (Windows)
+
+Back in your **Windows** terminal:
+
+```powershell
 cd frontend
 npm install
 npm run build
+npm start
 ```
- 
-Start with PM2:
- 
-```bash
-npm install -g pm2
-pm2 start npm --name vitcam-frontend -- start
-pm2 save
-```
- 
-Or for development:
- 
-```bash
-npm run dev
-```
- 
-#### 6. Install Backend
- 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
- 
-Start with PM2:
- 
-```bash
-pm2 start "python main.py" --name vitcam-backend --interpreter python
-pm2 save
-```
- 
-Or directly:
- 
-```bash
-python main.py
-```
- 
+
+The frontend will be available at `http://localhost:3000`. Sign in with the user you created in Step 4.
+
 ---
- 
+
 ## Configuration
- 
-All configuration is managed via the `.env` file in the project root. Copy `.env.example` to get started:
- 
+
+All configuration is managed via a `.env` file in the server directory. Copy `.env.example` to get started:
+
 ```bash
 cp .env.example .env
 ```
- 
+
 ### Key Environment Variables
- 
+
 ```env
 # ─── Supabase ───────────────────────────────────────────
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
- 
-# ─── Backend ────────────────────────────────────────────
-BACKEND_HOST=0.0.0.0
-BACKEND_PORT=8000
- 
-# ─── AI Inference ───────────────────────────────────────
-# Path to your RF-DETR model weights (PyTorch .pth)
-DETECTION_MODEL_PATH=models/rfdetr_person.pth
- 
+SUPABASE_URL=http://localhost:54321
+SUPABASE_KEY=your-anon-key
+
+# ─── Server ─────────────────────────────────────────────
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8765
+
 # ─── Recording ──────────────────────────────────────────
-RECORDING_MODE=motion          # 'motion' or 'continuous'
-RECORDING_RETENTION_DAYS=30    # Auto-delete clips older than N days
+DEFAULT_CODEC=VP9
+DEFAULT_CONTAINER=webm
+DEFAULT_RESOLUTION=640x480
+DEFAULT_FPS=30
+
+# ─── Performance ────────────────────────────────────────
+LOG_BUFFER_SIZE=50
+LOG_FLUSH_INTERVAL=10.0
+PERFORMANCE_LOG_INTERVAL=60.0
+
+# ─── Motion Detection ───────────────────────────────────
+DEFAULT_SENSITIVITY=20
+DEFAULT_AREA_THRESHOLD=5000
+
+# ─── WebRTC STUN/TURN ───────────────────────────────────
+WEBRTC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+WEBRTC_TURN_SERVER=turn:127.0.0.1:3478
+WEBRTC_TURN_USERNAME=webrtc
+WEBRTC_TURN_CREDENTIAL=webrtc123
+
+# ─── AI Model ───────────────────────────────────────────
+# Options: Nano, Small, Medium, Large, Custom
+MODEL_SIZE=Nano
+MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
 ```
- 
+
+> **Supabase keys:** After running `supabase start`, the CLI prints your local `API URL` and `anon key`. Use those values for `SUPABASE_URL` and `SUPABASE_KEY`. For Supabase Cloud, find them under **Project Settings → API**.
+
+> **Model checkpoint:** Place your `.pth` checkpoint file under `checkpoints/<model-name>/` and set `MODEL_CHECKPOINT_PATH` accordingly. Set `MODEL_SIZE` to `Custom` when using a non-standard checkpoint.
+
 ### Camera Configuration
- 
+
 Cameras are configured through the VitCam UI under **Settings → Cameras**. Each camera supports:
- 
+
 - RTSP stream URL
 - Display name and location label
 - Detection model selection
 - Recording mode override
 - Datetime overlay position and format
+
 ---
  
 ## Usage
@@ -431,26 +419,7 @@ Available at [vitcam.io](https://vitcam.io) *(coming soon)*.
 See [docs/training.md](docs/training.md) for a guide on fine-tuning RF-DETR on your own dataset using Open Images V7 or custom annotations.
  
 ---
- 
-## Apple Silicon
- 
-Experimental macOS / Apple Silicon support is available using MLX for model inference. This path does not require CUDA.
- 
-```bash
-pip install mlx mlx-lm
-```
- 
-Set in your `.env`:
- 
-```env
-INFERENCE_BACKEND=mlx
-DETECTION_MODEL_PATH=models/rfdetr_person_mlx
-```
- 
-Full Apple Silicon setup instructions: [docs/apple-silicon.md](docs/apple-silicon.md)
- 
----
- 
+
 ## Open-Core Edition
  
 VitCam follows an **open-core model**:
@@ -486,7 +455,7 @@ Contributions are welcome! VitCam is maintained by a solo developer, so please r
  
 ```bash
 # Fork and clone
-git clone https://github.com/your-username/vitcam.git
+git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
  
 # Backend (Python)
