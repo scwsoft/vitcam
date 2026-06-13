@@ -213,7 +213,7 @@ Default credentials are printed at the end of the install script. **Change them 
 
 VitCam's backend requires a Linux environment for GPU access and system services. On Windows, this is done by running the server inside **WSL2** (Windows Subsystem for Linux) while the frontend and Supabase CLI run natively in Windows PowerShell or Command Prompt.
 
-> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04, and an NVIDIA GPU with [CUDA drivers for WSL2](https://developer.nvidia.com/cuda/wsl).
+> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx). For the backend, choose either [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html) (native Windows, recommended) or [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04.
 
 #### Step 1 — Clone the Repository (Windows)
 
@@ -250,28 +250,74 @@ Once started, Supabase will print your local API URL and keys — copy these int
 2. Click **Add User**, enter your email and password
 3. Set **Auto Confirm** to on so the account is immediately active
 
-#### Step 5 — Install and Start the Backend (WSL2)
+#### Step 5 — Install and Start the Backend
 
-Open a **WSL2 terminal** (e.g. Ubuntu from the Start Menu or `wsl` in PowerShell). Navigate to your VitCam directory — your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.:
+Choose **one** of the two options below depending on your preference. The conda environment option runs natively on Windows and is recommended for users who want direct GPU access without WSL2.
+
+---
+
+**Option A — Conda Environment (native Windows, recommended)**
+
+> **Prerequisites:** [Anaconda](https://www.anaconda.com/download) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on Windows.
+
+Open **Anaconda Prompt** (or any terminal with `conda` on the PATH) and navigate to the server folder:
+
+```powershell
+cd <vitcam-dir>\server
+```
+
+Create and activate the environment, then install dependencies:
+
+```powershell
+conda create -n vit-server python=3.10.11 -y
+conda activate vit-server
+pip install -r requirements.txt
+```
+
+Install PyTorch with CUDA 12.8 support (Blackwell / sm_120 compatible):
+
+```powershell
+pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+Verify CUDA is detected before starting the server:
+
+```powershell
+python -c "import torch; print('CUDA Available:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
+```
+
+You should see `CUDA Available: True` and your GPU name. Then start the server:
+
+```powershell
+python main.py
+```
+
+> Each time you return to work on the server, re-activate the environment first: `conda activate vit-server`.
+
+---
+
+**Option B — WSL2 (Linux service, systemd-managed)**
+
+Open a **WSL2 terminal** (Ubuntu from the Start Menu, or run `wsl` in PowerShell). Your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.:
 
 ```bash
 cd /mnt/c/Users/<YourUser>/path/to/vitcam
 ```
 
-Run the server installer with sudo:
+Run the installer with sudo:
 
 ```bash
 sudo ./install-vitcam-server.sh
 ```
 
-Once installed, start and monitor the VitCam backend service:
+Once installed, start and monitor the backend service:
 
 ```bash
 sudo systemctl start vitcam
 journalctl -u vitcam -f
 ```
 
-> Leave this terminal open to watch live logs. Press `Ctrl+C` to stop following logs — the service itself will keep running.
+> Leave this terminal open to watch live logs. Press `Ctrl+C` to stop following — the service itself keeps running.
 
 #### Step 6 — Build and Start the Frontend (Windows)
 
@@ -386,7 +432,60 @@ The **Analytics** dashboard shows:
 - Object class breakdown (pie/bar charts)
 - Per-camera activity heatmaps
 - Recording storage usage
+---
+ 
+## AI Models
+ 
+VitCam uses RF-DETR for object detection, with model weights stored as PyTorch `.pth` checkpoints in the `models/` directory.
+ 
+> **Pre-trained models are available in VitCam Pro.** The community edition is BYOM (Bring Your Own Model) — you supply your own trained `.pth` weights. See the [Fine-Tuning](#fine-tuning-your-own-models) section below to train your own, or purchase a Pro license to access Anthropic's pre-trained surveillance models.
+ 
+### Bring Your Own Model (Community)
+ 
+VitCam supports any RF-DETR model saved as a PyTorch `.pth` checkpoint. To use your own:
+ 
+1. Place your `.pth` file in the `models/` directory
+2. Register it in the UI under **Settings → Models → Add Model**
+3. Assign it to a camera stream
+### Pre-Trained Models (Pro)
+ 
+Pro subscribers get access to ready-to-use pre-trained RF-DETR models via the VitCam model library:
+ 
+| Model | Classes | Notes |
+|-------|---------|-------|
+| `rfdetr_person.pth` | Person | General person detection and counting |
+| `rfdetr_vehicle.pth` | Car, truck, motorcycle, bus | Vehicle detection and classification |
+| `rfdetr_drone.pth` | Drone / UAV | Aerial drone detection |
+| `rfdetr_helmet.pth` | Safety helmet (on/off) | PPE compliance monitoring |
+ 
+Available at [vitcam.io](https://vitcam.io) *(coming soon)*.
+ 
+### Fine-Tuning Your Own Models
+ 
+See [docs/training.md](docs/training.md) for a guide on fine-tuning RF-DETR on your own dataset using Open Images V7 or custom annotations.
+ 
+---
 
+## Open-Core Edition
+ 
+VitCam follows an **open-core model**:
+ 
+| Feature | Community (AGPL 3.0) | Pro |
+|---------|---------------------|-----|
+| Live WebRTC streaming | ✅ | ✅ |
+| AI object detection (BYOM — bring your own model) | ✅ | ✅ |
+| Motion & continuous recording | ✅ | ✅ |
+| Analytics dashboard | ✅ | ✅ |
+| Self-hosted deployment | ✅ | ✅ |
+| Multi-camera (unlimited) | ✅ | ✅ |
+| Pre-trained surveillance models | ❌ | ✅ |
+| Specialty AI models (marketplace) | ❌ | ✅ |
+| Advanced alerting & webhooks | ❌ | ✅ |
+| Role-based access control (RBAC) | ❌ | ✅ |
+| Priority support | ❌ | ✅ |
+ 
+Pro features are available at [vitcam.io](https://vitcam.io) *(coming soon)*.
+ 
 ---
  
 ## Contributing
@@ -398,7 +497,29 @@ Contributions are welcome! VitCam is maintained by a solo developer, so please r
 1. **Report bugs** — Open an issue with steps to reproduce, your OS/GPU, and relevant logs
 2. **Suggest features** — Open a discussion before submitting a large PR
 3. **Submit fixes** — Small, focused PRs are much easier to review than large ones
-
+### Development Setup
+ 
+```bash
+# Fork and clone
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+ 
+# Backend (Python)
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+ 
+# Frontend (Next.js)
+cd ../frontend
+npm install
+npm run dev
+```
+ 
+### Code Style
+ 
+- **Python:** Black + isort (`make lint`)
+- **TypeScript/React:** ESLint + Prettier (`npm run lint`)
 ### Note on Pull Requests
  
 Due to the complexity of coordinating changes across the AI pipeline, streaming server, and frontend, pull requests are reviewed carefully and may take time. Please open an issue first for any significant feature work — this avoids duplicate effort and helps ensure the change aligns with the project roadmap.

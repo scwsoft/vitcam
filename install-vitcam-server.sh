@@ -106,17 +106,24 @@ PYTHON_BIN="$HOME/.pyenv/versions/$PYTHON_VERSION/bin/python"
 step "Updating apt and installing system dependencies"
 $SUDO_APT update -qq
 $SUDO_APT upgrade -y -qq
-# Build deps for compiling Python via pyenv, plus codecs the server needs for
-# video encode/decode (aiortc / OpenCV pull these in at runtime).
+# Build deps for compiling Python via pyenv, plus the FFmpeg stack the server
+# needs to OPEN and DECODE RTSP streams. Missing FFmpeg libs are the #1 cause
+# of "RTSP won't play": cv2.VideoCapture("rtsp://...") silently returns empty
+# frames when libavformat/libavcodec aren't present. The `ffmpeg` CLI is also
+# installed so RTSP can be tested independently of Python (see summary).
 $SUDO_APT install -y -qq \
     git curl wget unzip make ca-certificates gnupg lsb-release \
     build-essential libssl-dev zlib1g-dev libbz2-dev \
     libreadline-dev libsqlite3-dev llvm libncurses-dev xz-utils \
     tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev \
-    python3-openssl libx264-dev libavcodec-extra \
+    python3-openssl \
+    ffmpeg \
+    libavcodec-extra libavformat-dev libavutil-dev libswscale-dev \
+    libavdevice-dev libavfilter-dev libswresample-dev \
+    libx264-dev libx265-dev \
     libgl1 libglib2.0-0 \
     software-properties-common jq dos2unix
-ok "System packages installed"
+ok "System packages installed (incl. FFmpeg stack for RTSP)"
 
 # ─── 3. PYENV + PYTHON ────────────────────────────────────────────────────────
 step "Installing pyenv + Python $PYTHON_VERSION"
@@ -261,6 +268,18 @@ DEFAULT_MODEL=rfdetr
 DETECTION_CONFIDENCE=0.5
 DEVICE=cuda
 
+# RTSP / OpenCV FFmpeg transport.
+# Many IP cameras stream H.264 over RTSP and lose frames over UDP, making
+# cv2.VideoCapture return empty frames ("can't play"). Forcing TCP transport
+# fixes the most common case — and on WSL2 specifically, TCP is needed where
+# UDP silently fails. OpenCV's FFmpeg backend reads this exact env var.
+# Format note: option;value, multiple options joined by '|'. Keep it minimal —
+# a single unrecognised option (e.g. the renamed stimeout/timeout) can void the
+# whole string. Add more only if your camera needs them.
+OPENCV_FFMPEG_CAPTURE_OPTIONS=rtsp_transport;tcp
+# Some stacks also read this directly:
+RTSP_TRANSPORT=tcp
+
 # Optional TLS for the signaling server
 SSL_CERT_FILE=
 SSL_KEY_FILE=
@@ -340,6 +359,29 @@ if [[ -x "$VENV_DIR/bin/python" ]]; then
 fi
 [[ -f "$SERVER_DIR/.env" ]] && ok "server/.env present" || { VERIFIED=false; warn "server/.env MISSING"; }
 
+# RTSP capability: confirm the ffmpeg CLI is present and that OpenCV (whichever
+# build the requirements pulled in) reports FFmpeg support. No FFmpeg → no RTSP.
+command -v ffmpeg &>/dev/null \
+    && ok "ffmpeg CLI present ($(ffmpeg -version 2>/dev/null | head -1 | awk '{print $1,$2,$3}'))" \
+    || { VERIFIED=false; warn "ffmpeg CLI MISSING — RTSP capture will fail"; }
+if [[ -x "$VENV_DIR/bin/python" ]]; then
+    _CVFF=$("$VENV_DIR/bin/python" - <<'PYEOF' 2>/dev/null || echo "no-cv2"
+try:
+    import cv2, re
+    info = cv2.getBuildInformation()
+    m = re.search(r"FFMPEG:\s*(\w+)", info)
+    print(m.group(1) if m else "unknown")
+except Exception:
+    print("no-cv2")
+PYEOF
+)
+    case "$_CVFF" in
+        YES) ok "OpenCV reports FFMPEG: YES — RTSP supported" ;;
+        no-cv2) warn "cv2 not importable yet (installed via requirements at runtime?) — verify RTSP after first run" ;;
+        *) warn "OpenCV FFMPEG support = $_CVFF — RTSP may not work; consider reinstalling opencv-python in the venv" ;;
+    esac
+fi
+
 # ─── 11. SUMMARY ──────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}"
@@ -367,6 +409,11 @@ echo "║       ./$VENV_NAME/bin/python main.py                                �
 echo "║  4. Verify GPU (optional):                                          ║"
 echo "║       ~/vitcam/server/$VENV_NAME/bin/python -c \\                     ║"
 echo "║         'import torch; print(torch.cuda.is_available())'            ║"
+echo "║  5. Test an RTSP stream independently of the app:                   ║"
+echo "║       ffmpeg -rtsp_transport tcp -i 'rtsp://user:pass@CAM_IP:554/..' \\ ║"
+echo "║         -t 3 -f null -                # should show frame= lines      ║"
+echo "║     If ffmpeg plays it but the app doesn't, the TCP transport env    ║"
+echo "║     var in server/.env (OPENCV_FFMPEG_CAPTURE_OPTIONS) is the fix.   ║"
 echo "║                                                                      ║"
 echo "║  Note: Supabase and the frontend are NOT installed by this script.  ║"
 echo "╚══════════════════════════════════════════════════════════════════════╝"
