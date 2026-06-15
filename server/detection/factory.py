@@ -11,7 +11,6 @@ from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
 from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano, RFDETRSegMedium, RFDETRSegSmall, RFDETRSegLarge,RFDETRSegNano
 from config.settings import settings
 from supabase import create_client, Client
-from ultralytics import YOLO
 
 
 logger = logging.getLogger(__name__)
