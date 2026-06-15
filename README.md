@@ -28,6 +28,7 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Windows Setup (WSL2 / Conda)](#windows-setup-wsl2--conda)
   - [macOS Setup](#macos-setup)
 - [Configuration](#configuration)
+- [Screen Shots](#screen shots)
 - [Usage](#usage)
 - [AI Models](#ai-models)
 - [Open-Core Edition](#open-core-edition)
@@ -535,7 +536,10 @@ Each camera can operate in one of two modes:
 You can mix modes across cameras — for example, run AI detection on entrance cameras while keeping indoor cameras in standard NVR mode to save resources.
 
 ---
- 
+
+## Screen Shots
+ <img src="./docs/images/VitCam-Live.gif" /> <img src="./docs/images/VitCam-Live2.gif" />
+
 ## Usage
  
 ### Accessing the Dashboard
