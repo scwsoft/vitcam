@@ -1,24 +1,24 @@
-# <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" /> 
+# <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
 > **Self-hosted, on-premises AI camera surveillance and NVR platform**
- 
+
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
- 
+
 **VitCam is a fully local, on-premises AI-powered camera surveillance and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — VitCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
- 
+
 Unlike proprietary AI camera systems that lock you into specific hardware brands, subscription plans, or closed ecosystems, VitCam works with **any IP camera, NVR, or DVR that supports standard streaming protocols** — no matter the manufacturer. Swap cameras, change hardware, or scale your setup at any time without penalty.
- 
+
 Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered object detection, real-time video streaming, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system. **Your footage stays on your network. Always.**
 
 VitCam's AI detection runs on **both GPU and CPU** — so you can get started on any machine and upgrade to a GPU later for higher frame rates and lower latency. A dedicated NVIDIA GPU is recommended for production workloads, but not required to run VitCam.
- 
+
 > **No lock-in. Ever.** No proprietary hardware required. No mandatory cloud subscription. No vendor software you must keep paying for. Just open-source software running on commodity hardware you already own.
- 
+
 ---
- 
+
 ## Table of Contents
- 
+
 - [Features](#features)
 - [NVR & IP Camera Compatibility](#nvr--ip-camera-compatibility)
 - [Architecture Overview](#architecture-overview)
@@ -28,18 +28,19 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Windows Setup (WSL2 / Conda)](#windows-setup-wsl2--conda)
   - [macOS Setup](#macos-setup)
 - [Configuration](#configuration)
-- [Screen Shots](#screen shots)
+- [Screenshots](#screenshots)
 - [Usage](#usage)
 - [AI Models](#ai-models)
 - [Open-Core Edition](#open-core-edition)
 - [Contributing](#contributing)
 - [License](#license)
+
 ---
- 
+
 ## NVR & IP Camera Compatibility
- 
+
 VitCam supports multiple stream input protocols, so it works with a wide range of cameras, NVR systems, and even internet-based video sources — all processed and stored locally on your own machine.
- 
+
 | Protocol | Source Examples | Notes |
 |----------|----------------|-------|
 | **RTSP** | IP cameras, NVR/DVR systems (Hikvision, Dahua, Reolink, Amcrest, etc.) | Primary protocol; recommended for on-premises cameras |
@@ -47,35 +48,35 @@ VitCam supports multiple stream input protocols, so it works with a wide range o
 | **YouTube Live** | Public live streams, traffic cams, public surveillance feeds | Useful for testing or monitoring public sources |
 | **USB / Local Camera** | Built-in laptop cameras, USB webcams attached to the VitCam host | Referenced by device index using `local:<index>` (e.g. `local:0`) |
 | **ONVIF** | Standard-compliant IP cameras | 🔜 Auto-discovery coming soon |
- 
+
 > ⚠️ **Privacy & legal notice:** When connecting to any public or third-party stream (e.g. YouTube Live or public webcams), ensure you have the right to access and process that feed. VitCam does not condone unauthorized surveillance.
- 
+
 ### Stream URL Examples
- 
+
 **RTSP — NVR / IP Cameras (recommended for on-premises):**
- 
+
 ```
 # Hikvision NVR — Channel 1
 rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101
- 
+
 # Dahua NVR — Channel 2
 rtsp://admin:password@192.168.1.101:554/cam/realmonitor?channel=2&subtype=0
- 
+
 # Reolink camera
 rtsp://admin:password@192.168.1.102:554/h264Preview_01_main
- 
+
 # Generic
 rtsp://username:password@<camera-ip>:<port>/<stream-path>
 ```
- 
+
 **HTTP / MJPEG:**
- 
+
 ```
 http://<camera-ip>/video.mjpg
 http://<camera-ip>/mjpeg/1
 http://username:password@<camera-ip>:<port>/videostream.cgi
 ```
- 
+
 **YouTube Live:**
 
 ```
@@ -93,15 +94,15 @@ local:1
 ```
 
 > On Windows (WSL2), local cameras are accessed via the host. If `local:0` isn't detected, ensure the camera is not in use by another application.
- 
+
 VitCam pulls each stream and processes it locally. For on-premises cameras, no internet access or port forwarding is required.
- 
+
 ---
- 
+
 ## Features
- 
+
 ### Core (Free & Open Source)
- 
+
 - **Live WebRTC streaming** — Low-latency real-time video feeds from multiple cameras in your browser
 - **AI object detection (toggleable)** — Enable or disable AI detection per camera with a single toggle. When off, VitCam operates as a standard CCTV monitor and NVR — streaming and recording without any AI processing overhead
 - **GPU & CPU inference** — Runs on NVIDIA CUDA GPUs for maximum performance; falls back to CPU automatically so detection works on any machine, including laptops and macOS
@@ -118,17 +119,19 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 - **User authentication** — Full auth flows via Supabase Auth (email, OAuth)
 - **Profile management** — Per-user settings and preferences
 - **Self-hostable** — Runs entirely on your own hardware; your data never leaves your network
+
 ### AI Capabilities
- 
+
 - Person detection and counting
 - Vehicle detection and classification
 - Drone / UAV detection
 - Safety helmet detection
 - Custom model support (PyTorch `.pth`)
+
 ---
- 
+
 ## Architecture Overview
- 
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                        Browser                          │
@@ -136,7 +139,7 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 └──────────────────────┬──────────────────────────────────┘
                        │ WebRTC / REST / Realtime
 ┌──────────────────────▼──────────────────────────────────┐
-│                  Camera Server                         │
+│                  Camera Server                          │
 │   aiortc WebRTC Server  │  FastAPI REST API             │
 │   RF-DETR Detection     │  DeepSORT Tracking            │
 │   Recording Engine      │                               │
@@ -148,24 +151,24 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
        (Postgres)             Storage
       Auth, Events           Video Clips
 ```
- 
+
 VitCam is composed of two main services:
- 
+
 **Frontend** — A Next.js application handling the web UI, WebRTC video rendering, real-time subscriptions, and user interactions.
- 
+
 **Backend** — The Camera Server (FastAPI + aiortc) handling camera capture, AI inference with RF-DETR, object tracking with DeepSORT, and video recording.
- 
+
 **Supabase** — Used as the primary database (Postgres), file storage (video clips, snapshots), and authentication provider. Can be self-hosted via the Supabase CLI or used with Supabase Cloud.
- 
+
 ---
- 
+
 ## Requirements
- 
+
 ### Minimum
- 
+
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 or Conda, macOS 13+ |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
@@ -187,40 +190,41 @@ VitCam is composed of two main services:
 > For single-camera setups or development, a modern CPU (e.g. Apple M-series, Intel Core i7+) is sufficient with no GPU required.
 
 ---
- 
+
 ## Installation
- 
+
 ### Quick Start (Ubuntu)
- 
+
 The fastest way to get VitCam running on a fresh Ubuntu machine:
- 
+
 ```bash
 # Clone the repository
 git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
- 
+
 # Run the installer script
 chmod +x install.sh
 ./install.sh
 ```
- 
+
 The installer will:
- 
+
 1. Install system dependencies (Node.js, Python, ffmpeg, libGL, etc.)
 2. Set up a local Supabase instance
 3. Apply the database schema migrations
 4. Install frontend and backend dependencies
 5. Configure PM2 to manage the frontend and backend processes
 6. Start all services
+
 Once complete, open your browser at `http://localhost:3000`.
- 
+
 Default credentials are printed at the end of the install script. **Change them immediately.**
- 
+
 ---
 
-### Windows Setup (WSL2)
+### Windows Setup (WSL2 / Conda)
 
-VitCam's backend requires a Linux environment for GPU access and system services. On Windows, this is done by running the server inside **WSL2** (Windows Subsystem for Linux) while the frontend and Supabase CLI run natively in Windows PowerShell or Command Prompt.
+VitCam supports two backend setup paths on Windows. Choose the one that suits your workflow.
 
 > **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx). For the backend, choose either [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html) (native Windows, recommended) or [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04.
 
@@ -537,85 +541,94 @@ You can mix modes across cameras — for example, run AI detection on entrance c
 
 ---
 
-## Screen Shots
- <img src="./docs/images/VitCam-Live.gif" /> <img src="./docs/images/VitCam-Live2.gif" />
+## Screenshots
+
+<img src="./docs/images/VitCam-Live.gif" />
+
+<img src="./docs/images/VitCam-Live2.gif" />
+
+---
 
 ## Usage
- 
+
 ### Accessing the Dashboard
- 
+
 Navigate to `http://localhost:3000` (or your server's IP/domain) and sign in.
- 
+
 ### Adding a Camera
- 
+
 1. Go to **Cameras** → **Add Camera**
 2. Enter the stream URL (e.g. `rtsp://admin:password@192.168.1.100:554/stream1` or `local:0` for a built-in camera)
 3. Toggle **AI Detection** on or off
    - **On** — choose a detection model; VitCam will run real-time object detection on this stream
    - **Off** — camera runs in standard NVR mode (streaming and recording only, no AI overhead)
 4. Click **Save** — the stream will appear on the main dashboard within seconds
+
 ### Viewing Live Streams
- 
+
 The **Dashboard** page shows all active camera feeds in a grid layout. Click any feed to expand it to full view. For cameras with AI Detection enabled, bounding boxes and labels are overlaid in real time. Cameras in standard NVR mode display a clean feed with no overlays.
- 
+
 ### Reviewing Recordings
- 
+
 Go to **Video Management** to browse recorded clips organized by camera and date. Clips can be previewed, downloaded, or deleted from this view.
- 
+
 ### Detection Events
- 
+
 The **Events** page shows a chronological log of all detection events with:
- 
+
 - Timestamp and camera source
 - Detected object class and confidence score
 - Snapshot thumbnail
 - Bounding box coordinates
+
 ### Analytics
- 
+
 The **Analytics** dashboard shows:
- 
+
 - Detection counts over time (hourly, daily, weekly views)
 - Object class breakdown (pie/bar charts)
 - Per-camera activity heatmaps
 - Recording storage usage
+
 ---
- 
+
 ## AI Models
- 
+
 VitCam uses RF-DETR for object detection, with model weights stored as PyTorch `.pth` checkpoints in the `models/` directory.
- 
-> **Pre-trained models are available in VitCam Pro.** The community edition is BYOM (Bring Your Own Model) — you supply your own trained `.pth` weights. See the [Fine-Tuning](#fine-tuning-your-own-models) section below to train your own, or purchase a Pro license to access Anthropic's pre-trained surveillance models.
- 
+
+> **Pre-trained models are available in VitCam Pro.** The community edition is BYOM (Bring Your Own Model) — you supply your own trained `.pth` weights. See the [Fine-Tuning](#fine-tuning-your-own-models) section below to train your own, or purchase a Pro license to access pre-trained surveillance models.
+
 ### Bring Your Own Model (Community)
- 
+
 VitCam supports any RF-DETR model saved as a PyTorch `.pth` checkpoint. To use your own:
- 
+
 1. Place your `.pth` file in the `models/` directory
 2. Register it in the UI under **Settings → Models → Add Model**
 3. Assign it to a camera stream
+
 ### Pre-Trained Models (Pro)
- 
+
 Pro subscribers get access to ready-to-use pre-trained RF-DETR models via the VitCam model library:
- 
+
 | Model | Classes | Notes |
 |-------|---------|-------|
 | `rfdetr_person.pth` | Person | General person detection and counting |
 | `rfdetr_vehicle.pth` | Car, truck, motorcycle, bus | Vehicle detection and classification |
 | `rfdetr_drone.pth` | Drone / UAV | Aerial drone detection |
 | `rfdetr_helmet.pth` | Safety helmet (on/off) | PPE compliance monitoring |
- 
+
 Available at [vitcam.io](https://vitcam.io) *(coming soon)*.
- 
+
 ### Fine-Tuning Your Own Models
- 
+
 See [docs/training.md](docs/training.md) for a guide on fine-tuning RF-DETR on your own dataset using Open Images V7 or custom annotations.
- 
+
 ---
 
 ## Open-Core Edition
- 
+
 VitCam follows an **open-core model**:
- 
+
 | Feature | Community (AGPL 3.0) | Pro |
 |---------|---------------------|-----|
 | Live WebRTC streaming | ✅ | ✅ |
@@ -629,51 +642,53 @@ VitCam follows an **open-core model**:
 | Advanced alerting & webhooks | ❌ | ✅ |
 | Role-based access control (RBAC) | ❌ | ✅ |
 | Priority support | ❌ | ✅ |
- 
+
 Pro features are available at [vitcam.io](https://vitcam.io) *(coming soon)*.
- 
+
 ---
- 
+
 ## Contributing
- 
+
 Contributions are welcome! VitCam is maintained by a solo developer, so please read the contributing guidelines before submitting.
- 
+
 ### How to Contribute
- 
+
 1. **Report bugs** — Open an issue with steps to reproduce, your OS/GPU, and relevant logs
 2. **Suggest features** — Open a discussion before submitting a large PR
 3. **Submit fixes** — Small, focused PRs are much easier to review than large ones
+
 ### Development Setup
- 
+
 ```bash
 # Fork and clone
 git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
- 
+
 # Backend (Python)
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
- 
+
 # Frontend (Next.js)
 cd ../frontend
 npm install
 npm run dev
 ```
- 
+
 ### Code Style
- 
+
 - **Python:** Black + isort (`make lint`)
 - **TypeScript/React:** ESLint + Prettier (`npm run lint`)
+
 ### Note on Pull Requests
- 
+
 Due to the complexity of coordinating changes across the AI pipeline, streaming server, and frontend, pull requests are reviewed carefully and may take time. Please open an issue first for any significant feature work — this avoids duplicate effort and helps ensure the change aligns with the project roadmap.
- 
+
 ---
- 
+
 ## Roadmap
- 
+
 - [ ] AI Model Marketplace (specialty detection models)
 - [ ] Mobile app (iOS / Android)
 - [ ] Edge deployment support (Jetson Nano / Raspberry Pi)
@@ -682,45 +697,48 @@ Due to the complexity of coordinating changes across the AI pipeline, streaming 
 - [ ] Webhook integrations (Slack, Discord, email alerts)
 - [ ] Multi-tenant / RBAC support (Pro)
 - [ ] Cloud-managed option (Pro)
+
 ---
- 
+
 ## License
- 
+
 VitCam Community Edition is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
- 
+
 This means:
- 
+
 - You are free to use, modify, and distribute this software
 - If you run a modified version as a network service (e.g., a SaaS product), you **must** release your modifications under AGPL-3.0
 - Attribution to the original project is required
+
 See [LICENSE](LICENSE) for the full license text.
- 
+
 ```
 VitCam — AI-Powered Camera Surveillance Platform
 Copyright (C) 2024  Sean (VitCam Contributors)
- 
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
 by the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 ```
- 
+
 ---
- 
+
 ## Acknowledgements
- 
+
 VitCam is built on top of excellent open-source projects:
- 
+
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
 - [DeepSORT](https://github.com/nwojke/deep_sort) — Multi-object tracking
 - [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
 - [Supabase](https://supabase.com) — Open-source Firebase alternative
 - [Next.js](https://nextjs.org) — React framework
+
 ---
- 
+
 *Made with ❤️ in the Philippines*
