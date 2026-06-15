@@ -10,6 +10,8 @@
 Unlike proprietary AI camera systems that lock you into specific hardware brands, subscription plans, or closed ecosystems, VitCam works with **any IP camera, NVR, or DVR that supports standard streaming protocols** — no matter the manufacturer. Swap cameras, change hardware, or scale your setup at any time without penalty.
  
 Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered object detection, real-time video streaming, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system. **Your footage stays on your network. Always.**
+
+VitCam's AI detection runs on **both GPU and CPU** — so you can get started on any machine and upgrade to a GPU later for higher frame rates and lower latency. A dedicated NVIDIA GPU is recommended for production workloads, but not required to run VitCam.
  
 > **No lock-in. Ever.** No proprietary hardware required. No mandatory cloud subscription. No vendor software you must keep paying for. Just open-source software running on commodity hardware you already own.
  
@@ -100,7 +102,8 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 ### Core (Free & Open Source)
  
 - **Live WebRTC streaming** — Low-latency real-time video feeds from multiple cameras in your browser
-- **AI object detection** — RF-DETR-based detection with support for people, vehicles, drones, helmets, and more
+- **AI object detection (toggleable)** — Enable or disable AI detection per camera with a single toggle. When off, VitCam operates as a standard CCTV monitor and NVR — streaming and recording without any AI processing overhead
+- **GPU & CPU inference** — Runs on NVIDIA CUDA GPUs for maximum performance; falls back to CPU automatically so detection works on any machine, including laptops and macOS
 - **Object tracking** — DeepSORT-based multi-object tracking with persistent IDs across frames
 - **Motion-triggered recording** — Automatically records video clips when motion or detections are detected
 - **Continuous recording mode** — Always-on recording with configurable retention
@@ -165,11 +168,13 @@ VitCam is composed of two main services:
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
-| GPU | Optional — NVIDIA GPU strongly recommended for AI inference |
+| GPU | Optional — CPU inference is supported out of the box; an NVIDIA GPU is recommended for real-time multi-camera workloads |
 | Node.js | 18 or later |
 | Python | 3.10 or later |
 
-### Recommended (for AI workloads)
+> **No GPU? No problem.** VitCam automatically falls back to CPU-based inference if no CUDA-capable GPU is detected. CPU mode is suitable for testing, low-camera-count setups, and macOS. For real-time detection across multiple streams, an NVIDIA RTX GPU with CUDA is recommended.
+
+### Recommended (for real-time multi-camera AI workloads)
 
 | Component | Recommendation |
 |-----------|----------------|
@@ -177,6 +182,8 @@ VitCam is composed of two main services:
 | VRAM | 8 GB minimum |
 | CUDA | 12.x |
 | RAM | 16–32 GB |
+
+> For single-camera setups or development, a modern CPU (e.g. Apple M-series, Intel Core i7+) is sufficient with no GPU required.
 
 ---
  
@@ -337,7 +344,7 @@ The frontend will be available at `http://localhost:3000`. Sign in with the user
 
 ### macOS Setup
 
-VitCam runs on macOS for development and testing. GPU-accelerated inference is not available on Apple Silicon (no CUDA), but CPU-based detection works for evaluation purposes.
+VitCam runs on macOS for both development and production use on lower-camera-count setups. CUDA is not available on Apple Silicon, but VitCam's AI detection automatically runs on CPU — enabling real-time object detection without a discrete GPU.
 
 > **Prerequisites:** [Homebrew](https://brew.sh/), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (required for Supabase).
 
@@ -423,10 +430,10 @@ pip install -r requirements.txt
 
 ```bash
 pip install websockets aiortc uvicorn python-dotenv opencv-python supabase aiofiles
-pip install vidgear==0.3.4
+pip install vidgear==0.3.3
 pip install torch torchvision
 pip install supervision==0.25.1
-pip install rfdetr==1.4.0
+pip install rfdetr==1.3.0
 pip install fastapi==0.117.1
 ```
 
@@ -509,11 +516,23 @@ MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
 
 Cameras are configured through the VitCam UI under **Settings → Cameras**. Each camera supports:
 
-- RTSP stream URL
+- RTSP stream URL or local device index (e.g. `local:0`)
 - Display name and location label
-- Detection model selection
+- **AI detection toggle** — enable for smart detection, disable for standard CCTV/NVR mode
+- Detection model selection (when AI detection is enabled)
 - Recording mode override
 - Datetime overlay position and format
+
+### AI Detection vs. Standard NVR Mode
+
+Each camera can operate in one of two modes:
+
+| Mode | Description |
+|------|-------------|
+| **Standard NVR** (AI off) | Live streaming and continuous or motion-triggered recording with no AI processing. Lightweight — runs on any hardware. |
+| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, DeepSORT tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
+
+You can mix modes across cameras — for example, run AI detection on entrance cameras while keeping indoor cameras in standard NVR mode to save resources.
 
 ---
  
@@ -526,12 +545,14 @@ Navigate to `http://localhost:3000` (or your server's IP/domain) and sign in.
 ### Adding a Camera
  
 1. Go to **Cameras** → **Add Camera**
-2. Enter the RTSP URL (e.g., `rtsp://admin:password@192.168.1.100:554/stream1`)
-3. Choose a detection model
+2. Enter the stream URL (e.g. `rtsp://admin:password@192.168.1.100:554/stream1` or `local:0` for a built-in camera)
+3. Toggle **AI Detection** on or off
+   - **On** — choose a detection model; VitCam will run real-time object detection on this stream
+   - **Off** — camera runs in standard NVR mode (streaming and recording only, no AI overhead)
 4. Click **Save** — the stream will appear on the main dashboard within seconds
 ### Viewing Live Streams
  
-The **Dashboard** page shows all active camera feeds in a grid layout. Click any feed to expand it to full view. Detection bounding boxes and labels are overlaid in real time.
+The **Dashboard** page shows all active camera feeds in a grid layout. Click any feed to expand it to full view. For cameras with AI Detection enabled, bounding boxes and labels are overlaid in real time. Cameras in standard NVR mode display a clean feed with no overlays.
  
 ### Reviewing Recordings
  
