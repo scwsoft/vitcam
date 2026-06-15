@@ -23,7 +23,8 @@ Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered o
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
-  - [Windows Setup (WSL2)](#windows-setup-wsl2)
+  - [Windows Setup (WSL2 / Conda)](#windows-setup-wsl2--conda)
+  - [macOS Setup](#macos-setup)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [AI Models](#ai-models)
@@ -325,6 +326,126 @@ Back in your **Windows** terminal:
 
 ```powershell
 cd frontend
+npm install
+npm run build
+npm start
+```
+
+The frontend will be available at `http://localhost:3000`. Sign in with the user you created in Step 4.
+
+---
+
+### macOS Setup
+
+VitCam runs on macOS for development and testing. GPU-accelerated inference is not available on Apple Silicon (no CUDA), but CPU-based detection works for evaluation purposes.
+
+> **Prerequisites:** [Homebrew](https://brew.sh/), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (required for Supabase).
+
+#### Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+```
+
+#### Step 2 — Set Up Supabase (macOS)
+
+Install Docker Desktop first, then install and start the Supabase CLI:
+
+```bash
+brew install supabase/tap/supabase
+brew upgrade supabase
+```
+
+Initialise Supabase in the project root (skip if `supabase/` folder already exists):
+
+```bash
+supabase init
+supabase start
+```
+
+Once started, Supabase prints your local API URL and anon key — copy these into your `.env` file (see [Configuration](#configuration)).
+
+#### Step 3 — Apply the Database Schema
+
+1. Open **Supabase Studio** at `http://localhost:54323`
+2. Navigate to **SQL Editor**
+3. Open `dbschema.sql` from the root of your `vitcam` directory
+4. Paste the contents and click **Run**
+
+#### Step 4 — Create the First User
+
+1. In Supabase Studio, go to **Authentication → Users**
+2. Click **Add User**, enter your email and password
+3. Enable **Auto Confirm** so the account is immediately active
+
+#### Step 5 — Set Up the Python Environment (Backend)
+
+Install `pyenv` to manage the Python version:
+
+```bash
+brew update
+brew install pyenv
+```
+
+Add `pyenv` to your shell (for zsh, the default on macOS):
+
+```bash
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init --path)"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Install and set Python 3.10:
+
+```bash
+pyenv install 3.10.19
+pyenv global 3.10.19
+```
+
+Verify:
+
+```bash
+python --version   # Should print Python 3.10.19
+```
+
+#### Step 6 — Install Backend Dependencies
+
+Navigate to the server folder and install all requirements:
+
+```bash
+cd server
+pip install -r requirements.txt
+```
+
+> If `requirements.txt` is missing any of the packages below, install them manually:
+
+```bash
+pip install websockets aiortc uvicorn python-dotenv opencv-python supabase aiofiles
+pip install vidgear==0.3.4
+pip install torch torchvision
+pip install supervision==0.25.1
+pip install rfdetr==1.4.0
+pip install fastapi==0.117.1
+```
+
+> **Note:** The package is `python-dotenv`, not `dotnenv`. On Apple Silicon (M1/M2/M3), `opencv-python` may need Rosetta or a pre-built arm64 wheel — run `pip install opencv-python-headless` if the standard install fails.
+
+#### Step 7 — Start the Backend
+
+```bash
+python main.py
+```
+
+The backend will be available at `http://localhost:8765`. Leave this terminal open.
+
+#### Step 8 — Build and Start the Frontend
+
+Open a new terminal tab and navigate to the frontend folder:
+
+```bash
+cd <vitcam-dir>/frontend
 npm install
 npm run build
 npm start
