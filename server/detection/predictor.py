@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timezone
 from models.camera import CameraConfig
-from config.settings import COCO_CLASS_NAMES,CUSTOM_CLASS_NAMES
+from config.settings import COCO_CLASS_NAMES
 
 import cv2
 import io
@@ -454,9 +454,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 class_id = 0
 
             labels.append(
-                COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
-                # if 0 <= class_id < len(COCO_CLASS_NAMES)
-                # else f"class_{class_id}"
+                COCO_CLASS_NAMES[class_id] 
             )
 
         return labels

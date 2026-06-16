@@ -252,11 +252,6 @@ COCO_CLASS_NAMES = {
 #      2:"No Helmet"
 # }
 
-CUSTOM_CLASS_NAMES = {
-     1:"Drone",
-    
-}
-
 # Comprehensive bitrate mapping based on resolution and codec
 RESOLUTION_CODEC_BITRATE_MAP = {
     (1920, 1080): {
