@@ -154,9 +154,7 @@ export const MODEL_SIZE_OPTIONS = [
   { value: 'Large',  label: 'Large',  description: 'Highest accuracy, most compute' },
   { value: 'Medium', label: 'Medium', description: 'Balanced accuracy and speed' },
   { value: 'Small',  label: 'Small',  description: 'Faster inference, good accuracy' },
-  { value: 'Nano',   label: 'Nano',   description: 'Very fast, lightweight' },
-  { value: 'Custom',   label: 'Custom',   description: 'Fine-tuned with custom model weights' },
-
+  { value: 'Nano',   label: 'Nano',   description: 'Very fast, lightweight' }
 ] as const
 
 export const DETECTION_TYPE_OPTIONS = [
