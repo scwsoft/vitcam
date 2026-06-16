@@ -632,7 +632,6 @@ VitCam follows an **open-core model**:
 | Feature | Community (AGPL 3.0) | Pro |
 |---------|---------------------|-----|
 | Live WebRTC streaming | ✅ | ✅ |
-| AI object detection (BYOM — bring your own model) | ✅ | ✅ |
 | Motion & continuous recording | ✅ | ✅ |
 | Analytics dashboard | ✅ | ✅ |
 | Self-hosted deployment | ✅ | ✅ |
