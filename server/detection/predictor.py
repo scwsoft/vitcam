@@ -81,7 +81,7 @@ class CameraPredictor:
             
             labels = []
             for class_id, confidence in zip(detections.class_id, detections.confidence):
-                class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
+                class_name =  COCO_CLASS_NAMES[class_id] 
                 labels.append(f"{class_name} {confidence:.2f}")
             
             annotated_frame = frame.copy()
@@ -668,7 +668,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     continue
 
                 class_name  = (
-                    COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
+                    COCO_CLASS_NAMES[class_id] 
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────
