@@ -27,6 +27,7 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
   - [Windows Setup (WSL2 / Conda)](#windows-setup-wsl2--conda)
   - [macOS Setup](#macos-setup)
+  - [Raspberry Pi (Debian Bookworm)](#raspberry-pi-debian-bookworm)
 - [Configuration](#configuration)
 - [Screenshots](#screenshots)
 - [Usage](#usage)
@@ -168,7 +169,7 @@ VitCam is composed of two main services:
 
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 or Conda, macOS 13+ |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 or Conda, macOS 13+, Raspberry Pi OS 64-bit (Bookworm) |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
@@ -464,6 +465,119 @@ npm start
 ```
 
 The frontend will be available at `http://localhost:3000`. Sign in with the user you created in Step 4.
+
+---
+
+### Raspberry Pi (Debian Bookworm)
+
+VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA GPU on Raspberry Pi, so the backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
+
+> **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS (64-bit, Debian Bookworm). A 64-bit OS is required.
+
+#### Step 1 — Install Docker
+
+```bash
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+> After adding your user to the `docker` group, **log out and back in** (or reboot) so the group change takes effect before running any `docker` commands.
+
+#### Step 2 — Clone the Repository
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+```
+
+#### Step 3 — Install Node.js and Supabase
+
+Install Node.js 22:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+Clone the Supabase self-hosted stack into your `vitcam` folder and start it:
+
+```bash
+cd vitcam
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker
+cp .env.example .env
+docker compose up --detach
+```
+
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a minute or two on first run.
+
+#### Step 4 — Apply the Database Schema
+
+1. Open **Supabase Studio** at `http://localhost:8000`
+2. Navigate to the **SQL Editor**
+3. Open `dbschema.sql` from the root of your `vitcam` directory
+4. Paste its contents into the editor and click **Run**
+
+#### Step 5 — Create the First User
+
+1. In Supabase Studio, go to **Authentication → Users**
+2. Click **Add User**, enter your email and password
+3. Set **Auto Confirm** to on so the account is immediately active
+
+#### Step 6 — Build and Start the Frontend
+
+```bash
+cd ~/vitcam/frontend
+npm install
+npm run build
+npm start
+```
+
+The frontend will be available at `http://localhost:3000`. Leave this terminal open or run it under a process manager like PM2.
+
+#### Step 7 — Set Up Python with pyenv
+
+Install build dependencies:
+
+```bash
+sudo apt update && sudo apt install -y build-essential libssl-dev zlib1g-dev \
+  libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
+  libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev git
+```
+
+Install pyenv:
+
+```bash
+curl https://pyenv.run | bash
+```
+
+Add pyenv to your shell by appending the following lines to `~/.bashrc`:
+
+```bash
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+```
+
+Apply the changes:
+
+```bash
+exec "$SHELL"
+```
+
+#### Step 8 — Install Python and Start the Backend
+
+```bash
+pyenv install 3.10.11
+pyenv global 3.10.11
+cd ~/vitcam/server
+pip install -r requirements.txt
+python main.py
+```
+
+The backend will be available at `http://localhost:8765`. Leave this terminal open.
 
 ---
 
