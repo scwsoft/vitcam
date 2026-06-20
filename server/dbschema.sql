@@ -144,35 +144,6 @@ create policy "profiles_policy" on "public"."profiles" as PERMISSIVE for ALL to 
 create policy "system_logs_policy" on "public"."system_logs" as PERMISSIVE for ALL to anon, authenticated using (true) with check (true);
 
 
--- Create storage schema tables (these need to exist before Storage API starts)
-CREATE TABLE IF NOT EXISTS storage.buckets (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    owner UUID,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    public BOOLEAN DEFAULT FALSE,
-    avif_autodetection BOOLEAN DEFAULT FALSE,
-    file_size_limit BIGINT,
-    allowed_mime_types TEXT[],
-    CONSTRAINT buckets_name_key UNIQUE (name)
-);
-
-CREATE TABLE IF NOT EXISTS storage.objects (
-    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
-    bucket_id TEXT,
-    name TEXT,
-    owner UUID,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    last_accessed_at TIMESTAMPTZ DEFAULT NOW(),
-    metadata JSONB,
-    path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(name, '/')) STORED,
-    version TEXT,
-    CONSTRAINT objects_bucketid_objname_key UNIQUE(bucket_id, name),
-    CONSTRAINT objects_bucket_id_fkey FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id)
-);
-
 -- Create storage bucket for recordings (PUBLIC)
 INSERT INTO storage.buckets (
     id,
@@ -218,10 +189,6 @@ WHERE NOT EXISTS (
 );
 
 
-
--- Enable RLS on storage objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Allow authenticated uploads to vitcam-recordings" ON storage.objects;
@@ -288,42 +255,6 @@ ON storage.objects FOR DELETE
 TO anon, authenticated
 USING (bucket_id = 'detection-images');
 
-
-
--- Service role has full access to everything
-CREATE POLICY "Service role has full access"
-ON storage.objects FOR ALL
-TO service_role
-USING (true)
-WITH CHECK (true);
-
--- Allow reading bucket information
-CREATE POLICY "Allow public bucket access"
-ON storage.buckets FOR SELECT
-TO anon, authenticated
-USING (true);
-
--- Create a function to automatically set updated_at
-CREATE OR REPLACE FUNCTION storage.handle_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create triggers for updated_at
-DROP TRIGGER IF EXISTS set_updated_at ON storage.buckets;
-CREATE TRIGGER set_updated_at
-    BEFORE UPDATE ON storage.buckets
-    FOR EACH ROW
-    EXECUTE FUNCTION storage.handle_updated_at();
-
-DROP TRIGGER IF EXISTS set_updated_at ON storage.objects;
-CREATE TRIGGER set_updated_at
-    BEFORE UPDATE ON storage.objects
-    FOR EACH ROW
-    EXECUTE FUNCTION storage.handle_updated_at();
 
 
 ALTER TABLE object_detection_events 
