@@ -156,6 +156,12 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     NMS_IOU_THRESHOLD: float = 0.35   # tighter than original 0.50
     MIN_CONFIDENCE:    float = 0.50   # raised from original 0.45
 
+    # Separator between label fields. Must be ASCII — supervision's
+    # LabelAnnotator draws with cv2.putText, which can't render "•"/"·"/etc.
+    # (a non-ASCII char shows up as "???"). For a real bullet, switch the
+    # annotator to sv.RichLabelAnnotator (PIL/TTF based) instead.
+    LABEL_SEP: str = " | "
+
     def __init__(
         self,
         camera_config: CameraConfig,
@@ -331,24 +337,39 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 ]
             detections = detections[detections.confidence >= self.confidence_threshold]
 
+            # ── 3. Run tracker FIRST so we can attach dwell to the labels ─────
+            #   Pass `frame` (not the annotated copy) so the DeepSORT embedder
+            #   sees genuine pixels. Tracked boxes are still used only for
+            #   analytics + dwell lookup; the drawn boxes remain the raw,
+            #   frame-accurate model boxes (no tracker lag/jitter on screen).
+            tracked_detections = None
+            if len(detections) > 0 and self.analytics_manager:
+                tracked_detections = self._run_tracker(detections, frame)
+
+            # ── 4. Build labels (class • conf • dwell) ────────────────────────
+            #   Dwell per box is resolved by matching each raw detection to its
+            #   track. first_seen is owned by _log_tracked_detections, so a brand
+            #   new track shows no dwell for a frame or two — irrelevant, since
+            #   dwell only renders once it crosses 1 minute anyway.
+            dwell_per_det = self._dwell_for_detections(detections, tracked_detections)
             labels = []
-            for class_id, confidence in zip(detections.class_id, detections.confidence):
-                class_name =  COCO_CLASS_NAMES[class_id]
-                labels.append(f"{class_name}")
-            
+            for i, (class_id, confidence) in enumerate(
+                zip(detections.class_id, detections.confidence)
+            ):
+                class_name = COCO_CLASS_NAMES[class_id]
+                labels.append(
+                    self._build_detection_label(class_name, confidence, dwell_per_det[i])
+                )
+
             annotated_frame = frame.copy()
             annotated_frame = self.annotator.annotate(scene=annotated_frame, detections=detections)
             annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
 
-            # ── 6. Run tracker on CLEAN frame → analytics only ────────────────
-            #   Pass `frame` (not `annotated_frame`) so the DeepSORT embedder
-            #   sees genuine pixels, not annotation paint.
-            if len(detections) > 0 and self.analytics_manager:
-                tracked_detections = self._run_tracker(detections, frame)
-                if tracked_detections is not None and len(tracked_detections) > 0:
-                    asyncio.create_task(
-                        self._log_tracked_detections(tracked_detections, annotated_frame)
-                    )
+            # ── 5. Fire analytics (image saving, DB logging) ──────────────────
+            if tracked_detections is not None and len(tracked_detections) > 0:
+                asyncio.create_task(
+                    self._log_tracked_detections(tracked_detections, annotated_frame)
+                )
 
             return annotated_frame
 
@@ -458,6 +479,112 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             )
 
         return labels
+
+    # ── Internal: label formatting ────────────────────────────────────────────
+
+    @staticmethod
+    def _format_dwell(seconds: float) -> Optional[str]:
+        """
+        Format a track/dwell duration into a compact string.
+
+        Sub-minute durations are not shown (returns None).
+
+        Examples:
+            42     -> None    (under a minute → omitted)
+            65     -> "1m"
+            3725   -> "1h"
+        """
+        try:
+            seconds = max(0, int(seconds))
+        except (TypeError, ValueError):
+            seconds = 0
+
+        if seconds < 60:
+            return None
+        if seconds < 3600:
+            return f"{seconds // 60}m"
+        return f"{seconds // 3600}h"
+
+    def _build_detection_label(
+        self,
+        class_name: str,
+        confidence: float,
+        dwell_seconds: Optional[float] = None,
+    ) -> str:
+        """
+        Build a single annotation label of the form:
+
+            "Person | 0.93"        (no/sub-minute dwell → omitted)
+            "Person | 0.93 | 1m"   (dwell ≥ 1 minute)
+            "Person | 0.93 | 1h"   (dwell ≥ 1 hour)
+
+        Fields are joined by LABEL_SEP (ASCII). Used for both the returned
+        (live) frame and the saved per-object image so the two stay consistent.
+        """
+        parts = [f"{class_name}", f"{confidence:.2f}"]
+        if dwell_seconds is not None:
+            dwell_str = self._format_dwell(dwell_seconds)
+            if dwell_str:
+                parts.append(dwell_str)
+        return self.LABEL_SEP.join(parts)
+
+    @staticmethod
+    def _box_iou(a: np.ndarray, b: np.ndarray) -> float:
+        """IoU between two xyxy boxes."""
+        ax1, ay1, ax2, ay2 = a
+        bx1, by1, bx2, by2 = b
+        ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+        ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+        iw, ih   = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+        inter    = iw * ih
+        area_a   = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+        area_b   = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+        union    = area_a + area_b - inter
+        return float(inter / union) if union > 0 else 0.0
+
+    def _dwell_for_detections(
+        self,
+        detections: "sv.Detections",
+        tracked_detections: Optional["sv.Detections"],
+        iou_threshold: float = 0.5,
+    ) -> list:
+        """
+        Resolve a dwell time (seconds) for each raw detection by matching it to
+        the best-overlapping track and reading that track's first_seen.
+
+        Returns a list aligned with `detections` (None where no track matches or
+        first_seen isn't known yet). Drawn boxes stay the raw model boxes; this
+        only enriches their labels.
+        """
+        n = len(detections.xyxy) if hasattr(detections, "xyxy") else 0
+        dwell = [None] * n
+
+        if (
+            tracked_detections is None
+            or len(tracked_detections) == 0
+            or not hasattr(tracked_detections, "tracker_id")
+            or tracked_detections.tracker_id is None
+        ):
+            return dwell
+
+        now      = time.time()
+        t_boxes  = tracked_detections.xyxy
+        t_ids    = tracked_detections.tracker_id
+
+        for i in range(n):
+            best_iou, best_j = 0.0, -1
+            for j in range(len(t_boxes)):
+                iou = self._box_iou(detections.xyxy[i], t_boxes[j])
+                if iou > best_iou:
+                    best_iou, best_j = iou, j
+
+            if best_j >= 0 and best_iou >= iou_threshold:
+                tid  = int(t_ids[best_j])
+                info = self.tracked_objects.get(tid)
+                if info and info.get("first_seen"):
+                    dwell[i] = now - info["first_seen"]
+
+        return dwell
 
     # ── Internal: NMS helpers ─────────────────────────────────────────────────
 
@@ -710,10 +837,17 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                             save_frame = self.annotator.annotate(
                                 scene=save_frame, detections=single_det
                             )
+                            # Dwell at first detection is ~0 (track just started);
+                            # it reads e.g. "0s". See note below if a meaningful
+                            # dwell is needed on the stored image.
+                            dwell_seconds = track_metadata.get("track_duration", 0.0)
+                            detection_label = self._build_detection_label(
+                                class_name, confidence, dwell_seconds
+                            )
                             save_frame = self.label_annotator.annotate(
                                 scene=save_frame,
                                 detections=single_det,
-                                labels=[f"{class_name} {confidence:.2f}"],
+                                labels=[detection_label],
                             )
                             image_url = await self._save_detection_image(
                                 frame=save_frame,
