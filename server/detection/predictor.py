@@ -194,50 +194,61 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     
 
         # ── Tracker initialisation ────────────────────────────────────────────
-        try:
-            from deep_sort_realtime.deepsort_tracker import DeepSort
-            self.tracker = DeepSort(
-                max_age=50,
-                n_init=3,
-                nms_max_overlap=0.1,
-                max_cosine_distance=0.3,
-                nn_budget=100,
-                embedder="mobilenet",
-                half=True,
-                bgr=True,
-                embedder_gpu=True,
-                embedder_model_name=None,
-                embedder_wts=None,
-                polygon=False,
-                today=None,
-            )
-            logger.info(
-                f"DeepSORT tracker initialised for camera: {camera_config.name} "
-                "(using deep-sort-realtime)"
-            )
-            self.tracker_type = "DeepSORT"
-
-        except ImportError as e:
-            logger.error(f"DeepSORT not available: {e}")
-            try:
-                from supervision import ByteTrack
-                self.tracker = ByteTrack(
-                    track_activation_threshold=0.25,
-                    lost_track_buffer=50,
-                    minimum_matching_threshold=0.8,
-                    frame_rate=camera_config.fps,
-                )
-                logger.info(f"ByteTrack fallback initialised for camera: {camera_config.name}")
-                self.tracker_type = "ByteTrack"
-            except Exception as fallback_error:
-                self.tracker      = None
-                self.tracker_type = "None"
-                logger.warning(f"Tracking unavailable for {camera_config.name}: {fallback_error}")
-
-        except Exception as e:
+        # The tracker only feeds analytics, which only run while detection is
+        # active. When detection is disabled, skip loading it entirely so the
+        # DeepSORT appearance embedder (mobilenet) is never allocated.
+        if not camera_config.is_detection:
             self.tracker      = None
             self.tracker_type = "None"
-            logger.warning(f"Tracking unavailable for {camera_config.name}: {e}")
+            logger.info(
+                f"Detection disabled for camera: {camera_config.name}; "
+                "tracker not initialised (frames pass through unannotated)."
+            )
+        else:
+            try:
+                from deep_sort_realtime.deepsort_tracker import DeepSort
+                self.tracker = DeepSort(
+                    max_age=50,
+                    n_init=3,
+                    nms_max_overlap=0.1,
+                    max_cosine_distance=0.3,
+                    nn_budget=100,
+                    embedder="mobilenet",
+                    half=True,
+                    bgr=True,
+                    embedder_gpu=True,
+                    embedder_model_name=None,
+                    embedder_wts=None,
+                    polygon=False,
+                    today=None,
+                )
+                logger.info(
+                    f"DeepSORT tracker initialised for camera: {camera_config.name} "
+                    "(using deep-sort-realtime)"
+                )
+                self.tracker_type = "DeepSORT"
+
+            except ImportError as e:
+                logger.error(f"DeepSORT not available: {e}")
+                try:
+                    from supervision import ByteTrack
+                    self.tracker = ByteTrack(
+                        track_activation_threshold=0.25,
+                        lost_track_buffer=50,
+                        minimum_matching_threshold=0.8,
+                        frame_rate=camera_config.fps,
+                    )
+                    logger.info(f"ByteTrack fallback initialised for camera: {camera_config.name}")
+                    self.tracker_type = "ByteTrack"
+                except Exception as fallback_error:
+                    self.tracker      = None
+                    self.tracker_type = "None"
+                    logger.warning(f"Tracking unavailable for {camera_config.name}: {fallback_error}")
+
+            except Exception as e:
+                self.tracker      = None
+                self.tracker_type = "None"
+                logger.warning(f"Tracking unavailable for {camera_config.name}: {e}")
 
         # ── State ─────────────────────────────────────────────────────────────
         self.tracked_objects:    Dict[int, Dict] = {}

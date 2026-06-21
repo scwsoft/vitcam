@@ -43,15 +43,32 @@ class CameraPredictorFactory:
         """
 
         try:
-            
+
             device = None
             model = None
             print(f" camera config: {camera_config}")
-            
+
             if torch.cuda.is_available(): device = "cuda"
             elif torch.backends.mps.is_available(): device = "mps"
             else : device ="cpu"
-          
+
+            # ── Detection disabled: skip model + annotator loading ────────────
+            # When is_detection is False the predictor returns the original
+            # frame untouched, so there is no need to allocate the RF-DETR
+            # model (or the annotators). This avoids the GPU/VRAM cost for
+            # pass-through cameras.
+            if not camera_config.is_detection:
+                logger.info(
+                    f"Detection disabled for camera '{camera_config.name}'; "
+                    "skipping model load (frames pass through unannotated)."
+                )
+                return {
+                    'device': device,
+                    'model': None,
+                    'annotator': None,
+                    'label_annotator': None,
+                }
+
             if camera_config.modelsize == "Large" and camera_config.detectiontype == 'BoundingBox':
                 model = RFDETRLarge(device=device)
                 model.optimize_for_inference(compile=False) 
