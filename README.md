@@ -1,15 +1,15 @@
 # <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
-> **Self-hosted, on-premises AI camera surveillance and NVR platform**
+> **Self-hosted, on-premises AI camera surveillance, video analytics, and NVR platform**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**VitCam is a fully local, on-premises AI-powered camera surveillance and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — VitCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
+**VitCam is a fully local, on-premises AI-powered camera surveillance, video analytics, and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — VitCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
 
 Unlike proprietary AI camera systems that lock you into specific hardware brands, subscription plans, or closed ecosystems, VitCam works with **any IP camera, NVR, or DVR that supports standard streaming protocols** — no matter the manufacturer. Swap cameras, change hardware, or scale your setup at any time without penalty.
 
-Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered object detection, real-time video streaming, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system. **Your footage stays on your network. Always.**
+Connect your existing IP cameras and NVR systems, and VitCam layers AI-powered object detection, real-time video analytics, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system with deep insight into what's happening across your premises. **Your footage stays on your network. Always.**
 
 VitCam's AI detection runs on **both GPU and CPU** — so you can get started on any machine and upgrade to a GPU later for higher frame rates and lower latency. A dedicated NVIDIA GPU is recommended for production workloads, but not required to run VitCam.
 
@@ -111,7 +111,9 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 - **Motion-triggered recording** — Automatically records video clips when motion or detections are detected
 - **Continuous recording mode** — Always-on recording with configurable retention
 - **Detection event storage** — All events stored in Supabase with timestamps, bounding boxes, and confidence scores
-- **Analytics dashboard** — Visualize detection trends, heatmaps, and activity over time
+- **Video analytics dashboard** — Visualize detection trends, object counts, dwell times, heatmaps, and per-camera activity over time — hourly, daily, and weekly views
+- **People & vehicle counting** — Real-time and historical counts of people and vehicles passing through a scene
+- **Dwell time tracking** — Measure how long tracked objects remain in a zone
 - **Multi-camera management** — Add, configure, and monitor multiple camera streams from one interface
 - **Video management** — Browse and review recorded footage with Supabase Storage backend
 - **System logs viewer** — Real-time and historical system log access from the UI
@@ -123,10 +125,12 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 
 ### AI Capabilities
 
-- Person detection and counting
-- Vehicle detection and classification
+- Person detection, counting, and dwell time analysis
+- Vehicle detection and classification (car, truck, motorcycle, bus)
 - Drone / UAV detection
-- Safety helmet detection
+- Safety helmet / PPE compliance detection
+- Zone-based activity monitoring
+- Per-camera detection event logging with snapshot capture
 - Custom model support (PyTorch `.pth`)
 
 ---
@@ -221,13 +225,21 @@ Once complete, open your browser at `http://localhost:3000`.
 
 Default credentials are printed at the end of the install script. **Change them immediately.**
 
+To find your Supabase URL and anon key after install, run:
+
+```bash
+supabase status
+```
+
+Use the printed `API URL` and `anon key` values in `vitcam/frontend/.env` and `vitcam/server/.env` (see [Configuration](#configuration)).
+
 ---
 
 ### Windows Setup (WSL2 / Conda)
 
 VitCam supports two backend setup paths on Windows. Choose the one that suits your workflow.
 
-> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx). For the backend, choose either [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html) (native Windows, recommended) or [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04.
+> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (required for Supabase), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx). For the backend, choose either [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html) (native Windows, recommended) or [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04.
 
 #### Step 1 — Clone the Repository (Windows)
 
@@ -263,6 +275,41 @@ Once started, Supabase will print your local API URL and keys — copy these int
 1. In Supabase Studio, go to **Authentication → Users**
 2. Click **Add User**, enter your email and password
 3. Set **Auto Confirm** to on so the account is immediately active
+
+#### Step 4b — Get Your Supabase URL and Anon Key (Windows)
+
+You need these two values for both the frontend and server `.env` files.
+
+**Option A — from the CLI output:** When `supabase start` finishes, it prints a table like this:
+
+```
+API URL:     http://localhost:54321
+anon key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Copy those two values.
+
+**Option B — from Supabase Studio:**
+
+1. Open Supabase Studio at `http://localhost:54323`
+2. Go to **Project Settings → API**
+3. Copy the **URL** and **anon public** key
+
+Then add them to your config files:
+
+- **Frontend:** create or edit `vitcam/frontend/.env` and set:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+- **Server:** create or edit `vitcam/server/.env` and set:
+
+```env
+SUPABASE_URL=http://localhost:54321
+SUPABASE_KEY=your-anon-key
+```
 
 #### Step 5 — Install and Start the Backend
 
@@ -392,6 +439,41 @@ Once started, Supabase prints your local API URL and anon key — copy these int
 2. Click **Add User**, enter your email and password
 3. Enable **Auto Confirm** so the account is immediately active
 
+#### Step 4b — Get Your Supabase URL and Anon Key (macOS)
+
+You need these two values for both the frontend and server `.env` files.
+
+**Option A — from the CLI output:** When `supabase start` finishes, it prints a table like this:
+
+```
+API URL:     http://localhost:54321
+anon key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Copy those two values.
+
+**Option B — from Supabase Studio:**
+
+1. Open Supabase Studio at `http://localhost:54323`
+2. Go to **Project Settings → API**
+3. Copy the **URL** and **anon public** key
+
+Then add them to your config files:
+
+- **Frontend:** create or edit `vitcam/frontend/.env` and set:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+- **Server:** create or edit `vitcam/server/.env` and set:
+
+```env
+SUPABASE_URL=http://localhost:54321
+SUPABASE_KEY=your-anon-key
+```
+
 #### Step 5 — Set Up the Python Environment (Backend)
 
 Install `pyenv` to manage the Python version:
@@ -473,6 +555,8 @@ The frontend will be available at `http://localhost:3000`. Sign in with the user
 VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA GPU on Raspberry Pi, so the backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
 
 > **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS (64-bit, Debian Bookworm). A 64-bit OS is required.
+>
+> **Prerequisites:** [Docker](https://get.docker.com) (installed via script below — Docker Desktop is not available on Raspberry Pi; the Docker Engine is used directly), [Node.js 22](#step-2--install-nodejs), [Git](https://git-scm.com/).
 
 #### Step 1 — Install Docker
 
@@ -483,49 +567,90 @@ sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 ```
 
-> After adding your user to the `docker` group, **log out and back in** (or reboot) so the group change takes effect before running any `docker` commands.
+> After adding your user to the `docker` group, **log out and back in** (or reboot) before running any `docker` commands.
 
-#### Step 2 — Clone the Repository
-
-```bash
-git clone https://github.com/scwsoft/vitcam.git
-```
-
-#### Step 3 — Install Node.js and Supabase
-
-Install Node.js 22:
+#### Step 2 — Install Node.js
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Clone the Supabase self-hosted stack into your `vitcam` folder and start it:
+#### Step 3 — Clone the Repository
 
 ```bash
+git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
+```
+
+#### Step 4 — Set Up Supabase
+
+Clone the Supabase self-hosted Docker stack and start it:
+
+```bash
 git clone --depth 1 https://github.com/supabase/supabase.git
 cd supabase/docker
 cp .env.example .env
 docker compose up --detach
 ```
 
-> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a minute or two on first run.
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a couple of minutes on first run.
 
-#### Step 4 — Apply the Database Schema
+#### Step 5 — Apply the Database Schema
 
 1. Open **Supabase Studio** at `http://localhost:8000`
 2. Navigate to the **SQL Editor**
 3. Open `dbschema.sql` from the root of your `vitcam` directory
 4. Paste its contents into the editor and click **Run**
 
-#### Step 5 — Create the First User
+#### Step 6 — Create the First User
 
 1. In Supabase Studio, go to **Authentication → Users**
 2. Click **Add User**, enter your email and password
 3. Set **Auto Confirm** to on so the account is immediately active
 
-#### Step 6 — Build and Start the Frontend
+#### Step 6b — Get Your Supabase URL and Anon Key (Raspberry Pi)
+
+You need these two values for both the frontend and server `.env` files.
+
+On Raspberry Pi, Supabase runs via Docker so the keys are set in the `supabase/docker/.env` file you copied earlier. Open it to find them:
+
+```bash
+grep "ANON_KEY\|API_EXTERNAL_URL" ~/vitcam/supabase/docker/.env
+```
+
+This will print something like:
+
+```
+API_EXTERNAL_URL=http://localhost:8000
+ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Alternatively, retrieve them from Supabase Studio:
+
+1. Open Supabase Studio at `http://localhost:8000`
+2. Go to **Project Settings → API**
+3. Copy the **URL** and **anon public** key
+
+Then add them to your config files:
+
+- **Frontend:** create or edit `vitcam/frontend/.env` and set:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+- **Server:** create or edit `vitcam/server/.env` and set:
+
+```env
+SUPABASE_URL=http://localhost:8000
+SUPABASE_KEY=your-anon-key
+```
+
+#### Step 7 — Build and Start the Frontend
+
+Open a new terminal and run:
 
 ```bash
 cd ~/vitcam/frontend
@@ -534,9 +659,9 @@ npm run build
 npm start
 ```
 
-The frontend will be available at `http://localhost:3000`. Leave this terminal open or run it under a process manager like PM2.
+The frontend will be available at `http://localhost:3000`. Leave this terminal open or run it under PM2.
 
-#### Step 7 — Set Up Python with pyenv
+#### Step 8 — Set Up Python with pyenv
 
 Install build dependencies:
 
@@ -552,7 +677,7 @@ Install pyenv:
 curl https://pyenv.run | bash
 ```
 
-Add pyenv to your shell by appending the following lines to `~/.bashrc`:
+Add pyenv to your shell by appending the following lines to the end of `~/.bashrc`:
 
 ```bash
 export PYENV_ROOT="$HOME/.pyenv"
@@ -567,7 +692,7 @@ Apply the changes:
 exec "$SHELL"
 ```
 
-#### Step 8 — Install Python and Start the Backend
+#### Step 9 — Install Python and Start the Backend
 
 ```bash
 pyenv install 3.10.11
@@ -695,13 +820,16 @@ The **Events** page shows a chronological log of all detection events with:
 - Snapshot thumbnail
 - Bounding box coordinates
 
-### Analytics
+### Video Analytics
 
-The **Analytics** dashboard shows:
+The **Analytics** dashboard gives you deep insight into activity across all your cameras:
 
 - Detection counts over time (hourly, daily, weekly views)
+- People and vehicle counts per camera
+- Dwell time analysis — see how long objects linger in a scene
 - Object class breakdown (pie/bar charts)
 - Per-camera activity heatmaps
+- Detection event timeline with snapshot thumbnails
 - Recording storage usage
 
 ---
