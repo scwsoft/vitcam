@@ -78,7 +78,7 @@ header "Step 3 / 9 — Node.js"
 
 if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 18 ]]; then
   info "Installing Node.js 22..."
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - -qq
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt-get install -y -qq nodejs
 fi
 success "Node.js $(node -v) ready."
