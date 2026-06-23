@@ -10,8 +10,8 @@ class Settings:
     """Application configuration settings"""
     
     # Supabase Configuration
-    SUPABASE_URL = os.getenv("SUPABASE_URL", "your-supabase-url")
-    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-supabase-key")
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "vitcam-recordings")
      # Model Configuration - Small, Meduim, Large
     MODEL_SIZE= os.getenv("MODEL_SIZE")

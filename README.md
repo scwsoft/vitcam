@@ -25,7 +25,7 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
-  - [Windows Setup (WSL2 / Conda)](#windows-setup-wsl2--conda)
+  - [Windows Setup (Conda)](#windows-setup-conda)
   - [macOS Setup](#macos-setup)
   - [Raspberry Pi (Debian Bookworm)](#raspberry-pi-debian-bookworm)
 - [Configuration](#configuration)
@@ -173,7 +173,7 @@ VitCam is composed of two main services:
 
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 via WSL2 or Conda, macOS 13+, Raspberry Pi OS 64-bit (Bookworm) |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Raspberry Pi OS 64-bit (Bookworm) |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
@@ -203,43 +203,50 @@ VitCam is composed of two main services:
 The fastest way to get VitCam running on a fresh Ubuntu machine:
 
 ```bash
-# Clone the repository
 git clone https://github.com/scwsoft/vitcam.git
 cd vitcam
-
-# Run the installer script
-chmod +x install.sh
-./install.sh
+chmod +x install-linux.sh
+./install-linux.sh
 ```
 
-The installer will:
+The installer will automatically:
 
 1. Install system dependencies (Node.js, Python, ffmpeg, libGL, etc.)
-2. Set up a local Supabase instance
-3. Apply the database schema migrations
+2. Set up a local Supabase instance and apply the database schema
+3. Write `.env` files for the frontend and server with your Supabase keys
 4. Install frontend and backend dependencies
-5. Configure PM2 to manage the frontend and backend processes
-6. Start all services
+5. Start everything under PM2 (auto-restarts on reboot)
 
-Once complete, open your browser at `http://localhost:3000`.
-
-Default credentials are printed at the end of the install script. **Change them immediately.**
-
-To find your Supabase URL and anon key after install, run:
-
-```bash
-supabase status
-```
-
-Use the printed `API URL` and `anon key` values in `vitcam/frontend/.env` and `vitcam/server/.env` (see [Configuration](#configuration)).
+Once complete, open your browser at `http://localhost:3000`, then go to **Supabase Studio → Authentication → Users** to create your first login account.
 
 ---
 
-### Windows Setup (WSL2 / Conda)
+### Windows Setup (Conda)
 
-VitCam supports two backend setup paths on Windows. Choose the one that suits your workflow.
+VitCam supports two backend setup paths on Windows. For the fastest setup, use the provided PowerShell installer which handles Supabase, Conda environment, PyTorch, frontend build, and startup scripts automatically.
 
-> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (required for Supabase), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx). For the backend, choose either [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html) (native Windows, recommended) or [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu 22.04 or 24.04.
+> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (running), [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx).
+
+#### Option A — Automated Installer (recommended)
+
+Open **Anaconda Prompt** (or any terminal with `conda` on PATH), navigate to the repo, and run the installer:
+
+```powershell
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+```
+
+Then either **double-click `install-windows.bat`** in File Explorer, or run it from your terminal:
+
+```powershell
+.\install-windows.bat
+```
+
+> No need to change your PowerShell execution policy — the `.bat` file handles that automatically.
+
+After install, go to **Supabase Studio at `http://localhost:54323` → Authentication → Users** to create your first login account, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+
+#### Option B — Manual Setup
 
 #### Step 1 — Clone the Repository (Windows)
 
@@ -259,15 +266,15 @@ npm install -g supabase
 supabase start
 ```
 
-> Supabase requires Docker Desktop. Make sure it's running before this step.
+> Supabase requires Docker Desktop. Make sure it is running before this step.
 
-Once started, Supabase will print your local API URL and keys — copy these into your `.env` file (see [Configuration](#configuration)).
+Once started, Supabase will print your local API URL and anon key in the terminal output.
 
 #### Step 3 — Apply the Database Schema (Windows)
 
 1. Open **Supabase Studio** at `http://localhost:54323`
 2. Navigate to the **SQL Editor**
-3. Open `dbschema.sql` from the root of your cloned `vitcam` directory
+3. Open `dbschema.sql` from the `server/` folder of your cloned `vitcam` directory
 4. Paste its contents into the editor and click **Run**
 
 #### Step 4 — Create the First User (Windows)
@@ -278,46 +285,18 @@ Once started, Supabase will print your local API URL and keys — copy these int
 
 #### Step 4b — Get Your Supabase URL and Anon Key (Windows)
 
-You need these two values for both the frontend and server `.env` files.
-
-**Option A — from the CLI output:** When `supabase start` finishes, it prints a table like this:
-
-```
-API URL:     http://localhost:54321
-anon key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Copy those two values.
-
-**Option B — from Supabase Studio:**
-
 1. Open Supabase Studio at `http://localhost:54323`
 2. Go to **Project Settings → API**
 3. Copy the **URL** and **anon public** key
 
-Then add them to your config files:
+Then manually update these two files:
 
-- **Frontend:** create or edit `vitcam/frontend/.env` and set:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-- **Server:** create or edit `vitcam/server/.env` and set:
-
-```env
-SUPABASE_URL=http://localhost:54321
-SUPABASE_KEY=your-anon-key
-```
+- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
 
 #### Step 5 — Install and Start the Backend
 
-Choose **one** of the two options below depending on your preference. The conda environment option runs natively on Windows and is recommended for users who want direct GPU access without WSL2.
-
----
-
-**Option A — Conda Environment (native Windows, recommended)**
+**Conda Environment (native Windows)**
 
 > **Prerequisites:** [Anaconda](https://www.anaconda.com/download) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on Windows.
 
@@ -355,31 +334,6 @@ python main.py
 
 > Each time you return to work on the server, re-activate the environment first: `conda activate vit-server`.
 
----
-
-**Option B — WSL2 (Linux service, systemd-managed)**
-
-Open a **WSL2 terminal** (Ubuntu from the Start Menu, or run `wsl` in PowerShell). Your Windows drives are mounted at `/mnt/c/`, `/mnt/d/`, etc.:
-
-```bash
-cd /mnt/c/Users/<YourUser>/path/to/vitcam
-```
-
-Run the installer with sudo:
-
-```bash
-sudo ./install-vitcam-server.sh
-```
-
-Once installed, start and monitor the backend service:
-
-```bash
-sudo systemctl start vitcam
-journalctl -u vitcam -f
-```
-
-> Leave this terminal open to watch live logs. Press `Ctrl+C` to stop following — the service itself keeps running.
-
 #### Step 6 — Build and Start the Frontend (Windows)
 
 Back in your **Windows** terminal:
@@ -399,7 +353,20 @@ The frontend will be available at `http://localhost:3000`. Sign in with the user
 
 VitCam runs on macOS for both development and production use on lower-camera-count setups. CUDA is not available on Apple Silicon, but VitCam's AI detection automatically runs on CPU — enabling real-time object detection without a discrete GPU.
 
-> **Prerequisites:** [Homebrew](https://brew.sh/), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (required for Supabase).
+> **Prerequisites:** [Homebrew](https://brew.sh/), [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (running).
+
+#### Option A — Automated Installer (recommended)
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+chmod +x install-macos.sh
+./install-macos.sh
+```
+
+The installer handles everything: Supabase via Docker Compose, pyenv, Python, backend deps, frontend build, and PM2 process management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+
+#### Option B — Manual Setup
 
 #### Step 1 — Clone the Repository
 
@@ -410,27 +377,29 @@ cd vitcam
 
 #### Step 2 — Set Up Supabase (macOS)
 
-Install Docker Desktop first, then install and start the Supabase CLI:
+Install Docker Desktop first, then install the Supabase CLI (needed for some utilities) and set up the self-hosted Docker stack:
 
 ```bash
 brew install supabase/tap/supabase
 brew upgrade supabase
 ```
 
-Initialise Supabase in the project root (skip if `supabase/` folder already exists):
+Clone the Supabase self-hosted Docker stack and start it:
 
 ```bash
-supabase init
-supabase start
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker
+cp .env.example .env
+docker compose up --detach
 ```
 
-Once started, Supabase prints your local API URL and anon key — copy these into your `.env` file (see [Configuration](#configuration)).
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a few minutes on first run.
 
 #### Step 3 — Apply the Database Schema
 
-1. Open **Supabase Studio** at `http://localhost:54323`
+1. Open **Supabase Studio** at `http://localhost:8000`
 2. Navigate to **SQL Editor**
-3. Open `dbschema.sql` from the root of your `vitcam` directory
+3. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
 4. Paste the contents and click **Run**
 
 #### Step 4 — Create the First User
@@ -441,38 +410,14 @@ Once started, Supabase prints your local API URL and anon key — copy these int
 
 #### Step 4b — Get Your Supabase URL and Anon Key (macOS)
 
-You need these two values for both the frontend and server `.env` files.
-
-**Option A — from the CLI output:** When `supabase start` finishes, it prints a table like this:
-
-```
-API URL:     http://localhost:54321
-anon key:    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Copy those two values.
-
-**Option B — from Supabase Studio:**
-
-1. Open Supabase Studio at `http://localhost:54323`
+1. Open Supabase Studio at `http://localhost:8000`
 2. Go to **Project Settings → API**
 3. Copy the **URL** and **anon public** key
 
-Then add them to your config files:
+Then manually update these two files:
 
-- **Frontend:** create or edit `vitcam/frontend/.env` and set:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-- **Server:** create or edit `vitcam/server/.env` and set:
-
-```env
-SUPABASE_URL=http://localhost:54321
-SUPABASE_KEY=your-anon-key
-```
+- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
 
 #### Step 5 — Set Up the Python Environment (Backend)
 
@@ -555,8 +500,21 @@ The frontend will be available at `http://localhost:3000`. Sign in with the user
 VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA GPU on Raspberry Pi, so the backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
 
 > **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS (64-bit, Debian Bookworm). A 64-bit OS is required.
->
-> **Prerequisites:** [Docker](https://get.docker.com) (installed via script below — Docker Desktop is not available on Raspberry Pi; the Docker Engine is used directly), [Node.js 22](#step-2--install-nodejs), [Git](https://git-scm.com/).
+
+#### Option A — Automated Installer (recommended)
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+chmod +x install-raspberry-pi.sh
+./install-raspberry-pi.sh
+```
+
+The installer handles Docker Engine, Node.js, Supabase (via Docker Compose), pyenv, Python 3.10, all dependencies, frontend build, and PM2 process management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
+
+> On first run, compiling Python via pyenv on Raspberry Pi can take 10–20 minutes. This is normal.
+
+#### Option B — Manual Setup
 
 #### Step 1 — Install Docker
 
@@ -718,7 +676,7 @@ cp .env.example .env
 
 ```env
 # ─── Supabase ───────────────────────────────────────────
-SUPABASE_URL=http://localhost:54321
+SUPABASE_URL=http://localhost:8000
 SUPABASE_KEY=your-anon-key
 
 # ─── Server ─────────────────────────────────────────────
@@ -752,7 +710,7 @@ MODEL_SIZE=Nano
 MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
 ```
 
-> **Supabase keys:** After running `supabase start`, the CLI prints your local `API URL` and `anon key`. Use those values for `SUPABASE_URL` and `SUPABASE_KEY`. For Supabase Cloud, find them under **Project Settings → API**.
+> **Supabase keys:** Open Supabase Studio at `http://localhost:8000` → **Project Settings → API** to find your URL and anon key. Update `SUPABASE_URL` and `SUPABASE_KEY` in `server/.env`, and `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `frontend/.env`. For Supabase Cloud, find them under **Project Settings → API**.
 
 > **Model checkpoint:** Place your `.pth` checkpoint file under `checkpoints/<model-name>/` and set `MODEL_CHECKPOINT_PATH` accordingly. Set `MODEL_SIZE` to `Custom` when using a non-standard checkpoint.
 

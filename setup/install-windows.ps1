@@ -69,39 +69,29 @@ $supabaseOut = (supabase start 2>&1) -join "`n"
 
 Success "Supabase is running."
 
-Info "Applying database schema via Docker..."
-# Use docker exec to run psql inside the Supabase postgres container
-# This avoids needing psql installed on Windows
-$schemaSQL = Get-Content "$VITCAM_DIR\server\dbschema.sql" -Raw
-$schemaSQL | docker exec -i supabase_db_vitcam psql -U postgres -d postgres -q 2>&1 | Out-Null
+# Apply DB schema via docker exec into the Supabase postgres container
+Info "Applying database schema..."
+Get-Content "$VITCAM_DIR\server\dbschema.sql" -Raw | docker exec -i supabase_db_vitcam psql -U postgres -d postgres -q 2>&1 | Out-Null
 if ($LASTEXITCODE -eq 0) {
   Success "Database schema applied successfully."
 } else {
-  Warn "Could not auto-apply schema via Docker. Trying alternative container name..."
-  # Container name may differ depending on Supabase CLI version
-  $containerId = docker ps --filter "name=supabase" --filter "name=db" --format "{{.Names}}" 2>$null |
-    Where-Object { $_ -match "db" } | Select-Object -First 1
-  if ($containerId) {
-    $schemaSQL | docker exec -i $containerId psql -U postgres -d postgres -q 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-      Success "Database schema applied via container: $containerId"
-    } else {
-      Write-Host ""
-      Write-Host "  ACTION REQUIRED -- Apply the database schema manually:" -ForegroundColor Yellow
-      Write-Host "  --------------------------------------------------------" -ForegroundColor Yellow
-      Write-Host "  1. Supabase Studio is opening in your browser..."
-      Write-Host "  2. Go to: SQL Editor (left sidebar)"
-      Write-Host "  3. Open and paste this file into the editor:"
-      Write-Host "     $VITCAM_DIR\server\dbschema.sql" -ForegroundColor Cyan
-      Write-Host "  4. Click RUN"
-      Write-Host ""
-      Start-Process "http://localhost:54323/project/default/sql/new"
-      Write-Host "  Press ENTER once you have run the schema..." -ForegroundColor Yellow
-      Read-Host | Out-Null
-      Success "Database schema step complete."
-    }
-  }
+  Write-Host ""
+  Write-Host "  ACTION REQUIRED -- Apply the database schema manually:" -ForegroundColor Yellow
+  Write-Host "  --------------------------------------------------------"
+  Write-Host "  1. Open Supabase Studio in your browser:"
+  Write-Host "     http://localhost:54323" -ForegroundColor Cyan
+  Write-Host "  2. Go to SQL Editor (left sidebar)"
+  Write-Host "  3. Open and paste this file into the editor:"
+  Write-Host "     $VITCAM_DIR\server\dbschema.sql" -ForegroundColor Cyan
+  Write-Host "  4. Click RUN"
+  Write-Host ""
+  Start-Process "http://localhost:54323/project/default/sql/new"
+  Write-Host "  Press ENTER once you have run the schema..." -ForegroundColor Yellow
+  Read-Host | Out-Null
+  Success "Database schema step complete."
 }
+
+$ErrorActionPreference = "Stop"
 
 $ErrorActionPreference = "Stop"
 
