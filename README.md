@@ -334,6 +334,14 @@ python main.py
 
 > Each time you return to work on the server, re-activate the environment first: `conda activate vit-server`.
 
+> **Supabase connection error?** If the server fails to start with an invalid URL or connection error, your `SUPABASE_URL` and `SUPABASE_KEY` in `server/.env` have not been set yet. Update them with the values from Supabase Studio (**Project Settings → API**), then set them as environment variables for the current session and re-run:
+>
+> ```powershell
+> $env:SUPABASE_URL = "http://localhost:54321"
+> $env:SUPABASE_KEY = "your-anon-key"
+> python main.py
+> ```
+
 #### Step 6 — Build and Start the Frontend (Windows)
 
 Back in your **Windows** terminal:
