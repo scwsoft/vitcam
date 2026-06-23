@@ -98,8 +98,8 @@ success "Supabase running — URL: $SUPABASE_URL"
 # Apply DB schema
 info "Applying database schema..."
 PGPASSWORD=postgres psql -h localhost -p 54322 -U postgres -d postgres \
-  -f "$VITCAM_DIR/dbschema.sql" -q 2>/dev/null \
-  || warn "Could not auto-apply schema. Open http://localhost:54323 → SQL Editor and run dbschema.sql manually."
+  -f "$VITCAM_DIR/server/dbschema.sql" -q 2>/dev/null \
+  || warn "Could not auto-apply schema. Open http://localhost:54323 → SQL Editor and run server/dbschema.sql manually."
 
 success "Database schema applied."
 

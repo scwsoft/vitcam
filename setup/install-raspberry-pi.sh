@@ -145,11 +145,26 @@ success "Supabase running at $SUPABASE_URL"
 
 # Apply DB schema
 info "Applying database schema..."
-$DOCKER_CMD exec -i supabase-db psql -U postgres -d postgres \
-  < "$VITCAM_DIR/dbschema.sql" 2>/dev/null \
-  || warn "Could not auto-apply schema. Open http://localhost:$SUPABASE_PORT → SQL Editor and run dbschema.sql manually."
+SCHEMA_FILE="$VITCAM_DIR/server/dbschema.sql"
 
-success "Database schema applied."
+if [[ ! -f "$SCHEMA_FILE" ]]; then
+  warn "Schema file not found at $SCHEMA_FILE — skipping auto-apply."
+  warn "Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
+else
+  # Auto-detect the postgres container name
+  DB_CONTAINER=$($DOCKER_CMD ps --format '{{.Names}}' | grep -i "supabase.*db\|db.*supabase" | head -1)
+  if [[ -z "$DB_CONTAINER" ]]; then
+    DB_CONTAINER="supabase-db"
+  fi
+  info "Using postgres container: $DB_CONTAINER"
+
+  $DOCKER_CMD exec -i "$DB_CONTAINER" psql -U postgres -d postgres \
+    < "$SCHEMA_FILE" 2>/dev/null \
+    && success "Database schema applied." \
+    || {
+      warn "Could not auto-apply schema. Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
+    }
+fi
 
 # ── Write .env files ──────────────────────────────────────────────────────────
 header "Step 6 / 9 — Writing .env files"
