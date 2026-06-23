@@ -142,6 +142,9 @@ mkdir -p volumes/functions
 mkdir -p volumes/logs
 success "Storage directories ready."
 
+info "Pulling latest Supabase images (ensures versions match the Studio UI)..."
+$DOCKER_CMD compose pull
+
 info "Starting Supabase containers (first run may take several minutes)..."
 $DOCKER_CMD compose up --detach
 
