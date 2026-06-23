@@ -244,29 +244,107 @@ if ! grep -q 'pyenv init' ~/.bashrc; then
 fi
 
 # ── Backend dependencies ──────────────────────────────────────────────────────
-header "Step 9 / 9 — Backend dependencies & launch"
+header "Step 9 / 9 — Backend dependencies, nginx & systemd"
 
 cd "$VITCAM_DIR/server"
 pip install -q -r requirements.txt
 success "Backend dependencies installed."
 
-# ── PM2 ──────────────────────────────────────────────────────────────────────
-if ! command -v pm2 >/dev/null; then
-  npm install -g pm2 --silent
-fi
+# ── nginx ─────────────────────────────────────────────────────────────────────
+header "Deploying Frontend — nginx"
 
-pm2 delete vitcam-frontend 2>/dev/null || true
-pm2 delete vitcam-server   2>/dev/null || true
+sudo apt-get install -y -qq nginx
 
-pm2 start npm --name vitcam-frontend -- start \
-  --cwd "$VITCAM_DIR/frontend"
+# Write nginx config to proxy Next.js
+sudo tee /etc/nginx/sites-available/vitcam > /dev/null << NGINXCONF
+server {
+    listen 80;
+    server_name _;
 
-pm2 start python --name vitcam-server \
-  --cwd "$VITCAM_DIR/server" \
-  -- main.py
+    location / {
+        proxy_pass http://127.0.0.1:${FRONTEND_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
 
-pm2 save
-pm2 startup systemd -u "$USER" --hp "$HOME" | tail -1 | bash || true
+    location /api/server/ {
+        proxy_pass http://127.0.0.1:${SERVER_PORT}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+}
+NGINXCONF
+
+sudo ln -sf /etc/nginx/sites-available/vitcam /etc/nginx/sites-enabled/vitcam
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl enable nginx
+success "nginx configured — frontend proxied on port 80."
+
+# ── Frontend systemd service ──────────────────────────────────────────────────
+header "Deploying Frontend — systemd service"
+
+NPM_BIN="$(which npm)"
+
+sudo tee /etc/systemd/system/vitcam-frontend.service > /dev/null << SVCCONF
+[Unit]
+Description=VitCam Frontend (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${VITCAM_DIR}/frontend
+ExecStart=${NPM_BIN} start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=${FRONTEND_PORT}
+
+[Install]
+WantedBy=multi-user.target
+SVCCONF
+
+sudo systemctl daemon-reload
+sudo systemctl enable vitcam-frontend
+sudo systemctl restart vitcam-frontend
+success "vitcam-frontend service enabled and started."
+
+# ── Backend systemd service ───────────────────────────────────────────────────
+header "Deploying Backend — systemd service"
+
+PYTHON_BIN="$(pyenv which python)"
+
+sudo tee /etc/systemd/system/vitcam-server.service > /dev/null << SVCCONF
+[Unit]
+Description=VitCam Camera Server (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${VITCAM_DIR}/server
+ExecStart=${PYTHON_BIN} main.py
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=${VITCAM_DIR}/server/.env
+
+[Install]
+WantedBy=multi-user.target
+SVCCONF
+
+sudo systemctl daemon-reload
+sudo systemctl enable vitcam-server
+sudo systemctl restart vitcam-server
+success "vitcam-server service enabled and started."
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
@@ -274,16 +352,25 @@ echo -e "${GREEN}${BOLD}══════════════════�
 echo -e "${GREEN}${BOLD}  VitCam installed successfully!${RESET}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════${RESET}"
 echo ""
-echo -e "  Frontend:        ${CYAN}http://localhost:$FRONTEND_PORT${RESET}"
-echo -e "  Backend API:     ${CYAN}http://localhost:$SERVER_PORT${RESET}"
-echo -e "  Supabase Studio: ${CYAN}http://localhost:$SUPABASE_PORT${RESET}"
+RPI_IP=$(hostname -I | awk '{print $1}')
+echo -e "  Frontend:        ${CYAN}http://${RPI_IP}${RESET}  (port 80 via nginx)"
+echo -e "  Frontend direct: ${CYAN}http://localhost:${FRONTEND_PORT}${RESET}"
+echo -e "  Backend API:     ${CYAN}http://localhost:${SERVER_PORT}${RESET}"
+echo -e "  Supabase Studio: ${CYAN}http://localhost:${SUPABASE_PORT}${RESET}"
 echo ""
 echo -e "${YELLOW}  Next steps:${RESET}"
 echo -e "  1. Open Supabase Studio → Authentication → Users"
 echo -e "     and add your first login user (enable Auto Confirm)"
-echo -e "  2. Open ${CYAN}http://localhost:$FRONTEND_PORT${RESET} and sign in"
+echo -e "  2. Open ${CYAN}http://${RPI_IP}${RESET} from any device on your network"
 echo ""
-echo -e "  Manage services: ${BOLD}pm2 list${RESET} | ${BOLD}pm2 logs${RESET} | ${BOLD}pm2 restart all${RESET}"
-echo -e "  Supabase:        ${BOLD}cd $VITCAM_DIR/supabase/docker && sudo docker compose ps${RESET}"
+echo -e "  Service commands:"
+echo -e "    ${BOLD}sudo systemctl status vitcam-frontend${RESET}"
+echo -e "    ${BOLD}sudo systemctl status vitcam-server${RESET}"
+echo -e "    ${BOLD}sudo journalctl -u vitcam-server -f${RESET}     (live server logs)"
+echo -e "    ${BOLD}sudo journalctl -u vitcam-frontend -f${RESET}   (live frontend logs)"
+echo -e "    ${BOLD}sudo systemctl restart vitcam-server${RESET}"
+echo ""
+echo -e "  Supabase:  ${BOLD}cd $VITCAM_DIR/supabase/docker && sudo docker compose ps${RESET}"
+echo -e "  nginx:     ${BOLD}sudo systemctl status nginx${RESET} | ${BOLD}sudo nginx -t${RESET}"
 echo ""
 
