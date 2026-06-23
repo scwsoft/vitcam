@@ -204,18 +204,19 @@ The fastest way to get VitCam running on a fresh Ubuntu machine:
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam/server/setup
+cd vitcam/setup
 chmod +x install-linux.sh
 ./install-linux.sh
 ```
 
 The installer will automatically:
 
-1. Install system dependencies (Node.js, Python, ffmpeg, libGL, etc.)
-2. Set up a local Supabase instance and apply the database schema
-3. Write `.env` files for the frontend and server with your Supabase keys
-4. Install frontend and backend dependencies
-5. Start everything under PM2 (auto-restarts on reboot)
+1. Install system dependencies and NVIDIA CUDA drivers (if a GPU is detected)
+2. Install Docker, Node.js, and clone the repo
+3. Set up Supabase via Docker Compose and apply the database schema
+4. Prompt you to update your `.env` files with Supabase keys
+5. Install Python via pyenv and all backend dependencies
+6. Build the frontend and deploy via nginx + systemd services (auto-start on reboot)
 
 Once complete, open your browser at `http://localhost:3000`, then go to **Supabase Studio → Authentication → Users** to create your first login account.
 
@@ -229,22 +230,20 @@ VitCam supports two backend setup paths on Windows. For the fastest setup, use t
 
 #### Option A — Automated Installer (recommended)
 
-Open **Anaconda Prompt** (or any terminal with `conda` on PATH), navigate to the repo, and run the installer:
+Open **Anaconda Prompt** (so `conda` is active on PATH) and run:
 
 ```powershell
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam\server\setup
+cd vitcam\setup
 ```
 
-Then either **double-click `install-windows.bat`** in File Explorer, or run it from your terminal:
+Then run the installer from within the conda base environment:
 
 ```powershell
-.\install-windows.bat
+(base) .\install-windows.bat
 ```
 
-> The installer scripts are located in the `server/setup/` folder of the repository.
-
-> No need to change your PowerShell execution policy — the `.bat` file handles that automatically.
+> The installer must be run from **Anaconda Prompt** — `conda` must be available on PATH for the environment setup to work. The `.bat` file handles PowerShell execution policy automatically.
 
 After install, go to **Supabase Studio at `http://localhost:54323` → Authentication → Users** to create your first login account, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
 
@@ -369,12 +368,12 @@ VitCam runs on macOS for both development and production use on lower-camera-cou
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam/server/setup
+cd vitcam/setup
 chmod +x install-macos.sh
 ./install-macos.sh
 ```
 
-The installer handles everything: Supabase via Docker Compose, pyenv, Python, backend deps, frontend build, and PM2 process management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+The installer handles everything: Supabase via Docker Compose, pyenv, Python, backend deps, frontend build, nginx, and systemd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
 
 #### Option B — Manual Setup
 
@@ -515,12 +514,12 @@ VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA 
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam/server/setup
+cd vitcam/setup
 chmod +x install-raspberry-pi.sh
 ./install-raspberry-pi.sh
 ```
 
-The installer handles Docker Engine, Node.js, Supabase (via Docker Compose), pyenv, Python 3.10, all dependencies, frontend build, and PM2 process management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
+The installer handles Docker Engine, Node.js, Supabase (via Docker Compose), pyenv, Python 3.10, all dependencies, frontend build, nginx, and systemd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
 
 > On first run, compiling Python via pyenv on Raspberry Pi can take 10–20 minutes. This is normal.
 
@@ -627,7 +626,7 @@ npm run build
 npm start
 ```
 
-The frontend will be available at `http://localhost:3000`. Leave this terminal open or run it under PM2.
+The frontend will be available at `http://localhost:3000`. Leave this terminal open, or set it up as a systemd service for auto-start on reboot.
 
 #### Step 8 — Set Up Python with pyenv
 
@@ -950,4 +949,4 @@ VitCam is built on top of excellent open-source projects:
 
 ---
 
-*Made with ❤️ in the Philippines*
+*Made with ❤️ in the Philippines with Summer, Mommy Lyn and Scott*
