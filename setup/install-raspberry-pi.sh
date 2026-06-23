@@ -130,23 +130,25 @@ if [[ ! -f ".env" ]]; then
     cp .env.example .env
     info "Copied .env.example → .env"
   else
-    error ".env.example not found in $SUPABASE_DOCKER_DIR — the Supabase repo may be incomplete. Try deleting $VITCAM_DIR/supabase and re-running."
+    error ".env.example not found in $SUPABASE_DOCKER_DIR — try deleting $VITCAM_DIR/supabase and re-running."
   fi
 fi
 
-# Create required storage directories that Supabase Docker expects
+# Create required volume directories with correct ownership for Docker
 info "Creating Supabase storage directories..."
-mkdir -p volumes/db/data
-mkdir -p volumes/storage
-mkdir -p volumes/functions
-mkdir -p volumes/logs
+sudo mkdir -p volumes/db/data
+sudo mkdir -p volumes/storage
+sudo mkdir -p volumes/functions
+sudo mkdir -p volumes/logs
+sudo chown -R "$USER":"$USER" volumes/
 success "Storage directories ready."
 
-info "Pulling latest Supabase images (ensures versions match the Studio UI)..."
-$DOCKER_CMD compose pull
+# Always use sudo for docker compose to avoid socket permission issues
+info "Pulling latest Supabase images..."
+sudo docker compose pull
 
 info "Starting Supabase containers (first run may take several minutes)..."
-$DOCKER_CMD compose up --detach
+sudo docker compose up --detach
 
 # Wait for Supabase Studio to be healthy
 info "Waiting for Supabase Studio to be ready..."
@@ -160,7 +162,7 @@ done
 echo ""
 success "Supabase running at http://localhost:$SUPABASE_PORT"
 
-# Apply DB schema via docker exec
+# Apply DB schema via sudo docker exec
 info "Applying database schema..."
 SCHEMA_FILE="$VITCAM_DIR/server/dbschema.sql"
 
@@ -168,9 +170,9 @@ if [[ ! -f "$SCHEMA_FILE" ]]; then
   warn "Schema file not found at $SCHEMA_FILE"
   warn "Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
 else
-  DB_CONTAINER=$($DOCKER_CMD ps --format '{{.Names}}' 2>/dev/null | grep -i "supabase-db\|supabase_db" | head -1 || echo "supabase-db")
+  DB_CONTAINER=$(sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -i "supabase-db\|supabase_db" | head -1 || echo "supabase-db")
   info "Using postgres container: $DB_CONTAINER"
-  if $DOCKER_CMD exec -i "$DB_CONTAINER" psql -U postgres -d postgres < "$SCHEMA_FILE" 2>/dev/null; then
+  if sudo docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres < "$SCHEMA_FILE" 2>/dev/null; then
     success "Database schema applied."
   else
     warn "Could not auto-apply schema."
@@ -282,10 +284,6 @@ echo -e "     and add your first login user (enable Auto Confirm)"
 echo -e "  2. Open ${CYAN}http://localhost:$FRONTEND_PORT${RESET} and sign in"
 echo ""
 echo -e "  Manage services: ${BOLD}pm2 list${RESET} | ${BOLD}pm2 logs${RESET} | ${BOLD}pm2 restart all${RESET}"
-echo -e "  Supabase:        ${BOLD}cd $VITCAM_DIR/supabase/docker && $DOCKER_CMD compose ps${RESET}"
+echo -e "  Supabase:        ${BOLD}cd $VITCAM_DIR/supabase/docker && sudo docker compose ps${RESET}"
 echo ""
-if [[ "$DOCKER_CMD" == "sudo docker" ]]; then
-  echo -e "${YELLOW}  NOTE: Log out and back in (or run 'sudo reboot') to activate the"
-  echo -e "  docker group so future docker commands work without sudo.${RESET}"
-  echo ""
-fi
+
