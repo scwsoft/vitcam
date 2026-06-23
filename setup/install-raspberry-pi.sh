@@ -58,17 +58,24 @@ if ! command -v docker >/dev/null; then
   info "Installing Docker Engine..."
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
   sudo sh /tmp/get-docker.sh
-  sudo usermod -aG docker "$USER"
-  warn "Added $USER to docker group. A reboot may be needed if docker commands fail."
-  # Apply group without logout in current session
-  exec sg docker "$0 $*" || true
-else
-  success "Docker already installed: $(docker --version)"
 fi
 
+# Ensure user is in docker group
+if ! groups "$USER" | grep -q docker; then
+  sudo usermod -aG docker "$USER"
+  warn "Added $USER to docker group."
+fi
+
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Test docker access — use sudo if group not yet active in this session
 if ! docker info >/dev/null 2>&1; then
-  sudo systemctl start docker
-  sudo systemctl enable docker
+  warn "Docker group not active in this session — using sudo for docker commands."
+  DOCKER_CMD="sudo docker"
+else
+  DOCKER_CMD="docker"
+  success "Docker already installed: $(docker --version)"
 fi
 
 success "Docker Engine ready."
@@ -112,7 +119,7 @@ if [[ ! -f ".env" ]]; then
 fi
 
 info "Starting Supabase containers (first run may take several minutes)..."
-docker compose up --detach
+$DOCKER_CMD compose up --detach
 
 # Wait for Supabase Studio to be healthy
 info "Waiting for Supabase Studio to be ready..."
@@ -138,7 +145,7 @@ success "Supabase running at $SUPABASE_URL"
 
 # Apply DB schema
 info "Applying database schema..."
-docker exec -i supabase-db psql -U postgres -d postgres \
+$DOCKER_CMD exec -i supabase-db psql -U postgres -d postgres \
   < "$VITCAM_DIR/dbschema.sql" 2>/dev/null \
   || warn "Could not auto-apply schema. Open http://localhost:$SUPABASE_PORT → SQL Editor and run dbschema.sql manually."
 
@@ -257,5 +264,10 @@ echo -e "     and add your first login user (enable Auto Confirm)"
 echo -e "  2. Open ${CYAN}http://localhost:$FRONTEND_PORT${RESET} and sign in"
 echo ""
 echo -e "  Manage services: ${BOLD}pm2 list${RESET} | ${BOLD}pm2 logs${RESET} | ${BOLD}pm2 restart all${RESET}"
-echo -e "  Supabase:        ${BOLD}cd $VITCAM_DIR/supabase/docker && docker compose ps${RESET}"
+echo -e "  Supabase:        ${BOLD}cd $VITCAM_DIR/supabase/docker && $DOCKER_CMD compose ps${RESET}"
 echo ""
+if [[ "$DOCKER_CMD" == "sudo docker" ]]; then
+  echo -e "${YELLOW}  NOTE: Log out and back in (or run 'sudo reboot') to activate the"
+  echo -e "  docker group so future docker commands work without sudo.${RESET}"
+  echo ""
+fi
