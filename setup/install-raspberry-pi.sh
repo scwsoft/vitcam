@@ -114,11 +114,24 @@ if [[ ! -d "$VITCAM_DIR/supabase" ]]; then
   git clone --depth 1 https://github.com/supabase/supabase.git "$VITCAM_DIR/supabase"
 fi
 
+# Verify the docker folder exists inside the cloned repo
+if [[ ! -d "$SUPABASE_DOCKER_DIR" ]]; then
+  warn "Supabase docker directory not found — the previous clone may be incomplete."
+  warn "Removing and re-cloning..."
+  rm -rf "$VITCAM_DIR/supabase"
+  git clone --depth 1 https://github.com/supabase/supabase.git "$VITCAM_DIR/supabase"
+fi
+
 cd "$SUPABASE_DOCKER_DIR"
 
+# Copy .env.example only if .env doesn't exist yet
 if [[ ! -f ".env" ]]; then
-  cp .env.example .env
-  info "Copied .env.example → .env"
+  if [[ -f ".env.example" ]]; then
+    cp .env.example .env
+    info "Copied .env.example → .env"
+  else
+    error ".env.example not found in $SUPABASE_DOCKER_DIR — the Supabase repo may be incomplete. Try deleting $VITCAM_DIR/supabase and re-running."
+  fi
 fi
 
 # Create required storage directories that Supabase Docker expects
