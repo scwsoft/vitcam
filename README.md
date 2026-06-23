@@ -204,7 +204,7 @@ The fastest way to get VitCam running on a fresh Ubuntu machine:
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
+cd vitcam/server/setup
 chmod +x install-linux.sh
 ./install-linux.sh
 ```
@@ -233,7 +233,7 @@ Open **Anaconda Prompt** (or any terminal with `conda` on PATH), navigate to the
 
 ```powershell
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
+cd vitcam\server\setup
 ```
 
 Then either **double-click `install-windows.bat`** in File Explorer, or run it from your terminal:
@@ -241,6 +241,8 @@ Then either **double-click `install-windows.bat`** in File Explorer, or run it f
 ```powershell
 .\install-windows.bat
 ```
+
+> The installer scripts are located in the `server/setup/` folder of the repository.
 
 > No need to change your PowerShell execution policy — the `.bat` file handles that automatically.
 
@@ -367,7 +369,7 @@ VitCam runs on macOS for both development and production use on lower-camera-cou
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
+cd vitcam/server/setup
 chmod +x install-macos.sh
 ./install-macos.sh
 ```
@@ -513,7 +515,7 @@ VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA 
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
+cd vitcam/server/setup
 chmod +x install-raspberry-pi.sh
 ./install-raspberry-pi.sh
 ```
