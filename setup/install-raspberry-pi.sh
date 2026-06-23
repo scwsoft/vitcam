@@ -6,8 +6,11 @@
 # =============================================================================
 set -euo pipefail
 
+# Derive VitCam root from the script's own location (parent of setup/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VITCAM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO="https://github.com/scwsoft/vitcam.git"
-VITCAM_DIR="$HOME/vitcam"
+
 SERVER_PORT=8765
 FRONTEND_PORT=3000
 SUPABASE_PORT=8000
@@ -30,13 +33,13 @@ if [[ $EUID -eq 0 ]]; then
   error "Do not run as root. Run as a normal user with sudo access."
 fi
 
-# Detect 64-bit OS
 ARCH=$(uname -m)
 if [[ "$ARCH" != "aarch64" ]]; then
   error "A 64-bit OS (aarch64) is required. Current arch: $ARCH"
 fi
 
 info "Architecture: $ARCH — OK"
+info "VitCam directory: $VITCAM_DIR"
 
 # ── System update ─────────────────────────────────────────────────────────────
 header "Step 1 / 9 — System update & dependencies"
@@ -69,13 +72,13 @@ fi
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# Test docker access — use sudo if group not yet active in this session
+# Use sudo if group not yet active in this session
 if ! docker info >/dev/null 2>&1; then
   warn "Docker group not active in this session — using sudo for docker commands."
   DOCKER_CMD="sudo docker"
 else
   DOCKER_CMD="docker"
-  success "Docker already installed: $(docker --version)"
+  success "Docker $(docker --version) ready."
 fi
 
 success "Docker Engine ready."
@@ -93,11 +96,11 @@ success "Node.js $(node -v) ready."
 # ── Clone VitCam ──────────────────────────────────────────────────────────────
 header "Step 4 / 9 — Clone VitCam"
 
-if [[ -d "$VITCAM_DIR" ]]; then
-  warn "$VITCAM_DIR exists — pulling latest changes."
+if [[ -d "$VITCAM_DIR/.git" ]]; then
+  info "Repository already exists — pulling latest changes."
   git -C "$VITCAM_DIR" pull
 else
-  git clone "$REPO" "$VITCAM_DIR"
+  git clone "$REPO" "$VITCAM_DIR" 2>/dev/null || info "Using existing directory at $VITCAM_DIR."
 fi
 success "Repository ready at $VITCAM_DIR."
 
@@ -118,12 +121,20 @@ if [[ ! -f ".env" ]]; then
   info "Copied .env.example → .env"
 fi
 
+# Create required storage directories that Supabase Docker expects
+info "Creating Supabase storage directories..."
+mkdir -p volumes/db/data
+mkdir -p volumes/storage
+mkdir -p volumes/functions
+mkdir -p volumes/logs
+success "Storage directories ready."
+
 info "Starting Supabase containers (first run may take several minutes)..."
 $DOCKER_CMD compose up --detach
 
 # Wait for Supabase Studio to be healthy
 info "Waiting for Supabase Studio to be ready..."
-for i in $(seq 1 30); do
+for i in $(seq 1 36); do
   if curl -sf "http://localhost:$SUPABASE_PORT" >/dev/null 2>&1; then
     break
   fi
@@ -131,72 +142,46 @@ for i in $(seq 1 30); do
   sleep 5
 done
 echo ""
+success "Supabase running at http://localhost:$SUPABASE_PORT"
 
-# Extract keys from .env
-SUPABASE_ANON_KEY=$(grep '^ANON_KEY=' .env | cut -d= -f2- | tr -d '"' || true)
-SUPABASE_URL="http://localhost:$SUPABASE_PORT"
-
-if [[ -z "$SUPABASE_ANON_KEY" ]]; then
-  warn "Could not read ANON_KEY from .env. Set it manually in .env files after install."
-  SUPABASE_ANON_KEY="REPLACE_WITH_YOUR_ANON_KEY"
-fi
-
-success "Supabase running at $SUPABASE_URL"
-
-# Apply DB schema
+# Apply DB schema via docker exec
 info "Applying database schema..."
 SCHEMA_FILE="$VITCAM_DIR/server/dbschema.sql"
 
 if [[ ! -f "$SCHEMA_FILE" ]]; then
-  warn "Schema file not found at $SCHEMA_FILE — skipping auto-apply."
+  warn "Schema file not found at $SCHEMA_FILE"
   warn "Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
 else
-  # Auto-detect the postgres container name
-  DB_CONTAINER=$($DOCKER_CMD ps --format '{{.Names}}' | grep -i "supabase.*db\|db.*supabase" | head -1)
-  if [[ -z "$DB_CONTAINER" ]]; then
-    DB_CONTAINER="supabase-db"
-  fi
+  DB_CONTAINER=$($DOCKER_CMD ps --format '{{.Names}}' 2>/dev/null | grep -i "supabase-db\|supabase_db" | head -1 || echo "supabase-db")
   info "Using postgres container: $DB_CONTAINER"
-
-  $DOCKER_CMD exec -i "$DB_CONTAINER" psql -U postgres -d postgres \
-    < "$SCHEMA_FILE" 2>/dev/null \
-    && success "Database schema applied." \
-    || {
-      warn "Could not auto-apply schema. Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
-    }
+  if $DOCKER_CMD exec -i "$DB_CONTAINER" psql -U postgres -d postgres < "$SCHEMA_FILE" 2>/dev/null; then
+    success "Database schema applied."
+  else
+    warn "Could not auto-apply schema."
+    warn "Open http://localhost:$SUPABASE_PORT → SQL Editor and run server/dbschema.sql manually."
+  fi
 fi
 
-# ── Write .env files ──────────────────────────────────────────────────────────
-header "Step 6 / 9 — Writing .env files"
+# ── .env reminder ─────────────────────────────────────────────────────────────
+header "Step 6 / 9 — Configure .env files"
 
-cat > "$VITCAM_DIR/frontend/.env" <<EOF
-NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
-EOF
+echo ""
+echo -e "${YELLOW}  ACTION REQUIRED — Set your Supabase keys in the .env files:${RESET}"
+echo -e "  ----------------------------------------------------------------"
+echo -e "  1. Open Supabase Studio → Project Settings → API:"
+echo -e "     ${CYAN}http://localhost:$SUPABASE_PORT${RESET}"
+echo -e "     Copy the URL and anon public key"
+echo ""
+echo -e "  2. Edit and update NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY:"
+echo -e "     ${CYAN}$VITCAM_DIR/frontend/.env${RESET}"
+echo ""
+echo -e "  3. Edit and update SUPABASE_URL and SUPABASE_KEY:"
+echo -e "     ${CYAN}$VITCAM_DIR/server/.env${RESET}"
+echo ""
+echo -e "${YELLOW}  Press ENTER once you have updated both .env files...${RESET}"
+read -r
 
-cat > "$VITCAM_DIR/server/.env" <<EOF
-SUPABASE_URL=$SUPABASE_URL
-SUPABASE_KEY=$SUPABASE_ANON_KEY
-SERVER_HOST=0.0.0.0
-SERVER_PORT=$SERVER_PORT
-DEFAULT_CODEC=VP9
-DEFAULT_CONTAINER=webm
-DEFAULT_RESOLUTION=640x480
-DEFAULT_FPS=30
-LOG_BUFFER_SIZE=50
-LOG_FLUSH_INTERVAL=10.0
-PERFORMANCE_LOG_INTERVAL=60.0
-DEFAULT_SENSITIVITY=20
-DEFAULT_AREA_THRESHOLD=5000
-WEBRTC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
-WEBRTC_TURN_SERVER=turn:127.0.0.1:3478
-WEBRTC_TURN_USERNAME=webrtc
-WEBRTC_TURN_CREDENTIAL=webrtc123
-MODEL_SIZE=Nano
-MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
-EOF
-
-success ".env files written."
+success ".env configuration step complete."
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 header "Step 7 / 9 — Frontend"
@@ -215,12 +200,14 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 if [[ ! -d "$PYENV_ROOT" ]]; then
   info "Installing pyenv..."
   curl -fsSL https://pyenv.run | bash
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/bin:$PATH"
 fi
 
 eval "$(pyenv init -)" 2>/dev/null || true
 eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
 
-if ! pyenv versions | grep -q "$PYTHON_VERSION"; then
+if ! pyenv versions 2>/dev/null | grep -q "$PYTHON_VERSION"; then
   info "Installing Python $PYTHON_VERSION (this takes several minutes on Raspberry Pi)..."
   pyenv install "$PYTHON_VERSION"
 fi
