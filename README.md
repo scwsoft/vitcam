@@ -203,6 +203,8 @@ VitCam is composed of two main services:
 The fastest way to get VitCam running on a fresh Ubuntu machine:
 
 ```bash
+sudo apt update
+sudo apt install -y git
 git clone https://github.com/scwsoft/vitcam.git
 cd vitcam/setup
 chmod +x install-linux.sh
@@ -218,7 +220,7 @@ The installer will automatically:
 5. Install Python via pyenv and all backend dependencies
 6. Build the frontend and deploy via nginx + systemd services (auto-start on reboot)
 
-Once complete, open your browser at `http://localhost:3000`, then go to **Supabase Studio → Authentication → Users** to create your first login account.
+Once complete, open your browser at `http://localhost:3000`. Open **Supabase Studio at `http://localhost:8000` → Authentication → Users** to create your first login account.
 
 ---
 
@@ -245,7 +247,7 @@ Then run the installer from within the conda base environment:
 
 > The installer must be run from **Anaconda Prompt** — `conda` must be available on PATH for the environment setup to work. The `.bat` file handles PowerShell execution policy automatically.
 
-After install, go to **Supabase Studio at `http://localhost:54323` → Authentication → Users** to create your first login account, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+After install, go to **Supabase Studio at `http://localhost:54323` → Authentication → Users** to create your first login account, then update your `.env` files with your Supabase URL and anon key (found under **Project Settings → API**), and open `http://localhost:3000`.
 
 #### Option B — Manual Setup
 
@@ -685,7 +687,7 @@ cp .env.example .env
 
 ```env
 # ─── Supabase ───────────────────────────────────────────
-SUPABASE_URL=http://localhost:8000
+SUPABASE_URL=http://localhost:54321
 SUPABASE_KEY=your-anon-key
 
 # ─── Server ─────────────────────────────────────────────
@@ -719,7 +721,7 @@ MODEL_SIZE=Nano
 MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
 ```
 
-> **Supabase keys:** Open Supabase Studio at `http://localhost:8000` → **Project Settings → API** to find your URL and anon key. Update `SUPABASE_URL` and `SUPABASE_KEY` in `server/.env`, and `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `frontend/.env`. For Supabase Cloud, find them under **Project Settings → API**.
+> **Supabase keys:** After running `supabase start`, the CLI prints your local `API URL` and `anon key`. Use those values for `SUPABASE_URL` and `SUPABASE_KEY`. For Supabase Cloud, find them under **Project Settings → API**.
 
 > **Model checkpoint:** Place your `.pth` checkpoint file under `checkpoints/<model-name>/` and set `MODEL_CHECKPOINT_PATH` accordingly. Set `MODEL_SIZE` to `Custom` when using a non-standard checkpoint.
 
@@ -949,4 +951,4 @@ VitCam is built on top of excellent open-source projects:
 
 ---
 
-*Made with ❤️ in the Philippines with Summer, Mommy Lyn and Scott*
+*Made with ❤️ in the Philippines*
