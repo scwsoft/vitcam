@@ -93,10 +93,42 @@ fi
 # Create required volume directories
 info "Creating Supabase storage directories..."
 mkdir -p volumes/db/data
-mkdir -p volumes/storage
 mkdir -p volumes/functions
 mkdir -p volumes/logs
+# Note: volumes/storage intentionally NOT created as a bind mount --
+# macOS Docker Desktop bind mounts lack xattr support which breaks Supabase Storage.
+# We patch docker-compose.yml to use a named Docker volume instead (see below).
 success "Storage directories ready."
+
+# -- Fix macOS xattr issue: replace storage bind mount with named Docker volume --
+# macOS Docker Desktop bind mounts don't support extended attributes (xattr),
+# which causes "The file system does not support extended attributes" errors
+# when uploading files to Supabase Storage. The fix is a named Docker volume.
+info "Patching Supabase docker-compose.yml for macOS storage compatibility..."
+
+COMPOSE_FILE="$SUPABASE_DOCKER_DIR/docker-compose.yml"
+
+# Only patch if not already patched
+if grep -q "supabase_storage" "$COMPOSE_FILE" 2>/dev/null; then
+  info "docker-compose.yml already patched -- skipping."
+else
+  # Replace the storage bind mount line with a named volume reference
+  sed -i '' 's|./volumes/storage:/var/lib/storage|supabase_storage:/var/lib/storage|g' "$COMPOSE_FILE"
+
+  # Append named volume declaration if not present
+  if ! grep -q "^volumes:" "$COMPOSE_FILE"; then
+    echo "" >> "$COMPOSE_FILE"
+    echo "volumes:" >> "$COMPOSE_FILE"
+    echo "  supabase_storage:" >> "$COMPOSE_FILE"
+    echo "    driver: local" >> "$COMPOSE_FILE"
+  elif ! grep -q "supabase_storage:" "$COMPOSE_FILE"; then
+    # volumes: block exists -- append under it
+    echo "  supabase_storage:" >> "$COMPOSE_FILE"
+    echo "    driver: local" >> "$COMPOSE_FILE"
+  fi
+
+  success "docker-compose.yml patched -- storage will use a named Docker volume."
+fi
 
 info "Pulling latest Supabase images..."
 docker compose pull
