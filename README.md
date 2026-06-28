@@ -375,7 +375,7 @@ chmod +x install-macos.sh
 ./install-macos.sh
 ```
 
-The installer handles everything: Supabase via Docker Compose, pyenv, Python, backend deps, frontend build, nginx, and systemd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+The installer handles everything: Supabase via Docker Compose with S3/MinIO storage backend (fixes the macOS xattr issue), pyenv, Python, backend deps, frontend build, nginx, and launchd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
 
 #### Option B — Manual Setup
 
@@ -383,25 +383,26 @@ The installer handles everything: Supabase via Docker Compose, pyenv, Python, ba
 
 ```bash
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
+cd vitcam/setup
 ```
 
 #### Step 2 — Set Up Supabase (macOS)
 
-Install Docker Desktop first, then install the Supabase CLI (needed for some utilities) and set up the self-hosted Docker stack:
+Install Docker Desktop first, then clone and start the Supabase self-hosted Docker stack.
 
-```bash
-brew install supabase/tap/supabase
-brew upgrade supabase
-```
-
-Clone the Supabase self-hosted Docker stack and start it:
+> ⚠️ **macOS xattr issue:** Docker Desktop on macOS does not support extended attributes on bind-mounted volumes, which prevents Supabase Storage from saving files. The fix is to use `docker-compose.s3.yml` which spins up a local MinIO container as the storage backend — running entirely inside Docker's Linux layer where xattr is fully supported.
 
 ```bash
 git clone --depth 1 https://github.com/supabase/supabase.git
 cd supabase/docker
 cp .env.example .env
-docker compose up --detach
+```
+
+Pull the latest images and start with the S3/MinIO storage override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.s3.yml pull
+docker compose -f docker-compose.yml -f docker-compose.s3.yml up --detach
 ```
 
 > Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a few minutes on first run.
@@ -409,9 +410,10 @@ docker compose up --detach
 #### Step 3 — Apply the Database Schema
 
 1. Open **Supabase Studio** at `http://localhost:8000`
-2. Navigate to **SQL Editor**
-3. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
-4. Paste the contents and click **Run**
+2. Log in with default credentials: **Username:** `supabase` / **Password:** `this_password_is_insecure_and_should_be_updated`
+3. Navigate to **SQL Editor**
+4. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
+5. Paste the contents and click **Run**
 
 #### Step 4 — Create the First User
 
@@ -421,9 +423,8 @@ docker compose up --detach
 
 #### Step 4b — Get Your Supabase URL and Anon Key (macOS)
 
-1. Open Supabase Studio at `http://localhost:8000`
-2. Go to **Project Settings → API**
-3. Copy the **URL** and **anon public** key
+1. In Supabase Studio go to **Project Settings → API**
+2. Copy the **URL** and **anon public** key
 
 Then manually update these two files:
 
@@ -439,12 +440,13 @@ brew update
 brew install pyenv
 ```
 
-Add `pyenv` to your shell (for zsh, the default on macOS):
+Add `pyenv` to your shell (zsh is the default on macOS):
 
 ```bash
 echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
 echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
 echo 'eval "$(pyenv init --path)"' >> ~/.zshrc
+echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -453,58 +455,46 @@ Install and set Python 3.10:
 ```bash
 pyenv install 3.10.19
 pyenv global 3.10.19
-```
-
-Verify:
-
-```bash
 python --version   # Should print Python 3.10.19
 ```
 
 #### Step 6 — Install Backend Dependencies
 
-Navigate to the server folder and install all requirements:
-
 ```bash
-cd server
+cd vitcam/server
 pip install -r requirements.txt
 ```
 
-> If `requirements.txt` is missing any of the packages below, install them manually:
+> On Apple Silicon (M1/M2/M3/M4), if `opencv-python` fails run `pip install opencv-python-headless` instead.
+
+#### Step 7 — Build and Start the Frontend
 
 ```bash
-pip install websockets aiortc uvicorn python-dotenv opencv-python supabase aiofiles
-pip install vidgear==0.3.3
-pip install torch torchvision
-pip install supervision==0.25.1
-pip install rfdetr==1.3.0
-pip install fastapi==0.117.1
-```
-
-> **Note:** The package is `python-dotenv`, not `dotnenv`. On Apple Silicon (M1/M2/M3), `opencv-python` may need Rosetta or a pre-built arm64 wheel — run `pip install opencv-python-headless` if the standard install fails.
-
-#### Step 7 — Start the Backend
-
-```bash
-python main.py
-```
-
-The backend will be available at `http://localhost:8765`. Leave this terminal open.
-
-#### Step 8 — Build and Start the Frontend
-
-Open a new terminal tab and navigate to the frontend folder:
-
-```bash
-cd <vitcam-dir>/frontend
+cd vitcam/frontend
 npm install
 npm run build
 npm start
 ```
 
-The frontend will be available at `http://localhost:3000`. Sign in with the user you created in Step 4.
+The frontend will be available at `http://localhost:3000`.
 
----
+#### Step 8 — Start the Backend
+
+Open a new terminal tab:
+
+```bash
+cd vitcam/server
+python main.py
+```
+
+The backend will be available at `http://localhost:8765`. Sign in at `http://localhost:3000` with the user you created in Step 4.
+
+> **To manage Supabase after install:**
+> ```bash
+> cd vitcam/supabase/docker
+> docker compose -f docker-compose.yml -f docker-compose.s3.yml ps
+> docker compose -f docker-compose.yml -f docker-compose.s3.yml restart
+> ```
 
 ### Raspberry Pi (Debian Bookworm)
 
