@@ -95,46 +95,46 @@ info "Creating Supabase storage directories..."
 mkdir -p volumes/db/data
 mkdir -p volumes/functions
 mkdir -p volumes/logs
-# Note: volumes/storage intentionally NOT created as a bind mount --
-# macOS Docker Desktop bind mounts lack xattr support which breaks Supabase Storage.
-# We patch docker-compose.yml to use a named Docker volume instead (see below).
 success "Storage directories ready."
 
-# -- Fix macOS xattr issue: replace storage bind mount with named Docker volume --
+# -- Fix macOS xattr issue: use S3/MinIO storage backend ----------------------
 # macOS Docker Desktop bind mounts don't support extended attributes (xattr),
-# which causes "The file system does not support extended attributes" errors
-# when uploading files to Supabase Storage. The fix is a named Docker volume.
-info "Patching Supabase docker-compose.yml for macOS storage compatibility..."
+# which causes "The file system does not support extended attributes" error
+# when uploading files to Supabase Storage.
+#
+# The correct fix is to use docker-compose.s3.yml which spins up a local MinIO
+# container. MinIO acts as a local S3-compatible bucket running entirely inside
+# Docker's native Linux layer -- fully supporting xattr out of the box.
+# This completely bypasses the macOS filesystem restriction.
 
-COMPOSE_FILE="$SUPABASE_DOCKER_DIR/docker-compose.yml"
+info "Checking for S3/MinIO compose override (macOS xattr fix)..."
 
-# Only patch if not already patched
-if grep -q "supabase_storage" "$COMPOSE_FILE" 2>/dev/null; then
-  info "docker-compose.yml already patched -- skipping."
+if [[ -f "docker-compose.s3.yml" ]]; then
+  success "docker-compose.s3.yml found -- will use S3/MinIO storage backend."
 else
-  # Replace the storage bind mount line with a named volume reference
-  sed -i '' 's|./volumes/storage:/var/lib/storage|supabase_storage:/var/lib/storage|g' "$COMPOSE_FILE"
-
-  # Append named volume declaration if not present
-  if ! grep -q "^volumes:" "$COMPOSE_FILE"; then
-    echo "" >> "$COMPOSE_FILE"
-    echo "volumes:" >> "$COMPOSE_FILE"
-    echo "  supabase_storage:" >> "$COMPOSE_FILE"
-    echo "    driver: local" >> "$COMPOSE_FILE"
-  elif ! grep -q "supabase_storage:" "$COMPOSE_FILE"; then
-    # volumes: block exists -- append under it
-    echo "  supabase_storage:" >> "$COMPOSE_FILE"
-    echo "    driver: local" >> "$COMPOSE_FILE"
-  fi
-
-  success "docker-compose.yml patched -- storage will use a named Docker volume."
+  warn "docker-compose.s3.yml not found in this Supabase version."
+  warn "Storage uploads may fail on macOS. Check https://github.com/supabase/supabase/tree/master/docker"
 fi
 
-info "Pulling latest Supabase images..."
-docker compose pull
+# Wipe any previously broken volumes to ensure clean state
+info "Removing any previously broken storage volumes..."
+docker compose down -v 2>/dev/null || true
 
-info "Starting Supabase containers (first run may take several minutes)..."
-docker compose up --detach
+info "Pulling latest Supabase images..."
+if [[ -f "docker-compose.s3.yml" ]]; then
+  docker compose -f docker-compose.yml -f docker-compose.s3.yml pull
+else
+  docker compose pull
+fi
+
+info "Starting Supabase containers with S3/MinIO storage backend..."
+if [[ -f "docker-compose.s3.yml" ]]; then
+  docker compose -f docker-compose.yml -f docker-compose.s3.yml up --detach
+  success "Supabase started with MinIO storage backend (xattr issue resolved)."
+else
+  docker compose up --detach
+  warn "Started with default storage backend -- xattr issues may occur on macOS."
+fi
 
 # Wait for Supabase Studio to be healthy
 info "Waiting for Supabase Studio to be ready..."
@@ -405,6 +405,7 @@ echo -e "    ${BOLD}launchctl start io.vitcam.server${RESET}           (start se
 echo -e "    ${BOLD}tail -f ~/Library/Logs/vitcam-server.log${RESET}  (live server logs)"
 echo -e "    ${BOLD}tail -f ~/Library/Logs/vitcam-frontend.log${RESET} (live frontend logs)"
 echo ""
-echo -e "  Supabase:  ${BOLD}cd $VITCAM_DIR/supabase/docker && docker compose ps${RESET}"
+echo -e "  Supabase:  ${BOLD}cd $VITCAM_DIR/supabase/docker${RESET}"
+  echo -e "             ${BOLD}docker compose -f docker-compose.yml -f docker-compose.s3.yml ps${RESET}"
 echo -e "  nginx:     ${BOLD}brew services info nginx${RESET}"
 echo ""
