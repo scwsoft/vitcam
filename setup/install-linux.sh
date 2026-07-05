@@ -45,7 +45,7 @@ info "Installing as root, services will run as: $RUN_AS"
 info "VitCam directory: $VITCAM_DIR"
 
 # -- Step 1 / 9: System dependencies ------------------------------------------
-header "Step 1 / 9 -- System dependencies"
+header "Step 1 / 10 -- System dependencies"
 
 apt-get update -qq
 apt-get upgrade -y -qq
@@ -58,7 +58,7 @@ apt-get install -y -qq \
 success "System dependencies installed."
 
 # -- Step 2 / 9: NVIDIA CUDA (auto-detected) ----------------------------------
-header "Step 2 / 9 -- NVIDIA CUDA"
+header "Step 2 / 10 -- NVIDIA CUDA"
 
 CUDA_INSTALLED=false
 GPU_FOUND=false
@@ -108,7 +108,7 @@ fi
 success "GPU/CPU setup complete."
 
 # -- Step 3 / 9: Docker -------------------------------------------------------
-header "Step 3 / 9 -- Docker Engine"
+header "Step 3 / 10 -- Docker Engine"
 
 # Detect if running inside a Docker container
 IN_CONTAINER=false
@@ -169,7 +169,7 @@ fi
 success "Docker $(docker --version) ready."
 
 # -- Step 4 / 9: Node.js ------------------------------------------------------
-header "Step 4 / 9 -- Node.js"
+header "Step 4 / 10 -- Node.js"
 
 if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 18 ]]; then
   info "Installing Node.js 22..."
@@ -178,66 +178,105 @@ if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 1
 fi
 success "Node.js $(node -v) ready."
 
-# -- Step 5 / 9: Supabase via Docker ------------------------------------------
-header "Step 5 / 9 -- Supabase (Docker)"
+# -- Step 5 / 9: Clone VitCam ------------------------------------------------
+header "Step 5 / 10 -- Clone VitCam"
+
+if [[ -d "$VITCAM_DIR/.git" ]]; then
+  info "Repository already exists -- pulling latest changes."
+  git -C "$VITCAM_DIR" pull
+else
+  git clone "$REPO" "$VITCAM_DIR"
+fi
+success "Repository ready at $VITCAM_DIR."
+
+# -- Step 6 / 9: Supabase via Docker ------------------------------------------
+header "Step 6 / 10 -- Supabase (Docker)"
 
 SUPABASE_DOCKER_DIR="$VITCAM_DIR/supabase/docker"
 
+# Clone Supabase self-hosted stack into vitcam/supabase/
 if [[ ! -d "$VITCAM_DIR/supabase" ]]; then
   info "Cloning Supabase self-hosted stack..."
   git clone --depth 1 https://github.com/supabase/supabase.git "$VITCAM_DIR/supabase"
 fi
 
+# Verify docker subfolder exists -- re-clone if incomplete
 if [[ ! -d "$SUPABASE_DOCKER_DIR" ]]; then
-  warn "Supabase docker directory missing -- re-cloning..."
+  warn "Supabase docker directory not found -- previous clone may be incomplete."
+  warn "Removing and re-cloning..."
   rm -rf "$VITCAM_DIR/supabase"
   git clone --depth 1 https://github.com/supabase/supabase.git "$VITCAM_DIR/supabase"
 fi
 
 cd "$SUPABASE_DOCKER_DIR"
 
+# Copy .env.example -> .env if not already done
 if [[ ! -f ".env" ]]; then
-  [[ -f ".env.example" ]] || error ".env.example not found -- delete $VITCAM_DIR/supabase and re-run."
-  cp .env.example .env
-  info "Copied .env.example -> .env"
+  if [[ -f ".env.example" ]]; then
+    cp .env.example .env
+    info "Copied .env.example -> .env"
+  else
+    error ".env.example not found -- try deleting $VITCAM_DIR/supabase and re-running."
+  fi
 fi
 
-# Create volume directories
-mkdir -p volumes/db/data volumes/storage volumes/functions volumes/logs
+# Create required volume directories with correct ownership
+info "Creating Supabase storage directories..."
+mkdir -p volumes/db/data
+mkdir -p volumes/storage
+mkdir -p volumes/functions
+mkdir -p volumes/logs
 chown -R "$RUN_AS":"$RUN_AS" volumes/
+success "Storage directories ready."
 
+# Pull latest images then start -- run from supabase/docker/ directory
 info "Pulling latest Supabase images..."
 docker compose pull
 
-info "Starting Supabase containers..."
+info "Starting Supabase containers (first run may take several minutes)..."
 docker compose up --detach
 
-# Wait for Supabase Studio
-info "Waiting for Supabase Studio..."
+# Wait for Supabase Studio to be healthy
+info "Waiting for Supabase Studio to be ready..."
+SUPABASE_READY=false
 for i in $(seq 1 36); do
-  curl -sf "http://localhost:$SUPABASE_PORT" >/dev/null 2>&1 && break
+  if curl -sf "http://localhost:$SUPABASE_PORT" >/dev/null 2>&1; then
+    SUPABASE_READY=true
+    break
+  fi
   echo -n "."
   sleep 5
 done
 echo ""
-success "Supabase running at http://localhost:$SUPABASE_PORT"
 
-# Apply DB schema
+if $SUPABASE_READY; then
+  success "Supabase running at http://localhost:$SUPABASE_PORT"
+else
+  warn "Supabase Studio did not respond within 3 minutes."
+  warn "Check container status: docker compose ps"
+fi
+
+# Apply DB schema via docker exec
+info "Applying database schema..."
 SCHEMA_FILE="$VITCAM_DIR/server/dbschema.sql"
-if [[ -f "$SCHEMA_FILE" ]]; then
-  info "Applying database schema..."
-  DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i "supabase-db\|supabase_db" | head -1 || echo "supabase-db")
+
+if [[ ! -f "$SCHEMA_FILE" ]]; then
+  warn "Schema file not found at $SCHEMA_FILE"
+  warn "Apply it manually: Supabase Studio -> SQL Editor -> run server/dbschema.sql"
+else
+  DB_CONTAINER=$(docker ps --format '{{.Names}}' 2>/dev/null \
+    | grep -i "supabase-db\|supabase_db" | head -1 || echo "supabase-db")
+  info "Using postgres container: $DB_CONTAINER"
   if docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres < "$SCHEMA_FILE" 2>/dev/null; then
     success "Database schema applied."
   else
-    warn "Could not auto-apply schema -- do it manually in Supabase Studio -> SQL Editor."
+    warn "Could not auto-apply schema."
+    warn "Apply it manually: Supabase Studio -> SQL Editor -> run server/dbschema.sql"
   fi
-else
-  warn "Schema file not found at $SCHEMA_FILE -- apply it manually in Supabase Studio."
 fi
 
-# -- Step 6 / 9: Configure .env -----------------------------------------------
-header "Step 6 / 9 -- Configure .env files"
+# -- Step 7 / 10: Configure .env -----------------------------------------------
+header "Step 7 / 10 -- Configure .env files"
 
 echo ""
 echo -e "${YELLOW}  ACTION REQUIRED -- Configure Supabase and update .env files:${RESET}"
@@ -261,8 +300,8 @@ echo -e "${YELLOW}  Press ENTER when done...${RESET}"
 read -r
 success ".env configuration done."
 
-# -- Step 7 / 9: Python / pyenv -----------------------------------------------
-header "Step 7 / 9 -- Python $PYTHON_VERSION (pyenv)"
+# -- Step 8 / 10: Python / pyenv -----------------------------------------------
+header "Step 8 / 10 -- Python $PYTHON_VERSION (pyenv)"
 
 export PYENV_ROOT="$RUN_HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -299,8 +338,8 @@ fi
 chown "$RUN_AS":"$RUN_AS" "$BASHRC"
 success "Python $PYTHON_VERSION ready."
 
-# -- Step 8 / 9: Backend dependencies -----------------------------------------
-header "Step 8 / 9 -- Backend dependencies"
+# -- Step 9 / 10: Backend dependencies -----------------------------------------
+header "Step 9 / 10 -- Backend dependencies"
 
 su - "$RUN_AS" -c "
   export PYENV_ROOT=\"$RUN_HOME/.pyenv\"
@@ -311,8 +350,8 @@ su - "$RUN_AS" -c "
 "
 success "Backend dependencies installed."
 
-# -- Step 9 / 9: Frontend + nginx + systemd -----------------------------------
-header "Step 9 / 9 -- Frontend, nginx & systemd services"
+# -- Step 10 / 10: Frontend + nginx + systemd -----------------------------------
+header "Step 10 / 10 -- Frontend, nginx & systemd services"
 
 # Build frontend as the run-as user
 su - "$RUN_AS" -c "
