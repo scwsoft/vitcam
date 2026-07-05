@@ -32,7 +32,6 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
 - [Screenshots](#screenshots)
 - [Usage](#usage)
 - [AI Models](#ai-models)
-- [Open-Core Edition](#open-core-edition)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -118,9 +117,6 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 - **Video management** — Browse and review recorded footage with Supabase Storage backend
 - **System logs viewer** — Real-time and historical system log access from the UI
 - **Datetime overlay** — Configurable timestamp overlays on video streams
-- **Supabase real-time** — Live UI updates via Supabase real-time subscriptions
-- **User authentication** — Full auth flows via Supabase Auth (email, OAuth)
-- **Profile management** — Per-user settings and preferences
 - **Self-hostable** — Runs entirely on your own hardware; your data never leaves your network
 
 ### AI Capabilities
@@ -140,30 +136,21 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                        Browser                          │
-│              Next.js Frontend (WebRTC + UI)             │
+│                   Web Interface (UI)                    │
 └──────────────────────┬──────────────────────────────────┘
                        │ WebRTC / REST / Realtime
 ┌──────────────────────▼──────────────────────────────────┐
 │                  Camera Server                          │
-│   aiortc WebRTC Server  │  FastAPI REST API             │
-│   RF-DETR Detection     │  DeepSORT Tracking            │
-│   Recording Engine      │                               │
+│   Live Streaming Engine  │  REST API                   │
+│   AI Detection           │  Object Tracking            │
+│   Recording Engine       │                             │
 └──────────────────────┬──────────────────────────────────┘
                        │
              ┌─────────┴─────────┐
              ▼                   ▼
-        Supabase             Supabase
-       (Postgres)             Storage
+          Database             Storage
       Auth, Events           Video Clips
 ```
-
-VitCam is composed of two main services:
-
-**Frontend** — A Next.js application handling the web UI, WebRTC video rendering, real-time subscriptions, and user interactions.
-
-**Backend** — The Camera Server (FastAPI + aiortc) handling camera capture, AI inference with RF-DETR, object tracking with DeepSORT, and video recording.
-
-**Supabase** — Used as the primary database (Postgres), file storage (video clips, snapshots), and authentication provider. Can be self-hosted via the Supabase CLI or used with Supabase Cloud.
 
 ---
 
@@ -199,15 +186,6 @@ VitCam is composed of two main services:
 ## Installation
 
 ### Quick Start (Ubuntu)
-
-The installer runs as **root** and handles everything automatically — Docker, Supabase, Python, nginx, and systemd services. No user switching required.
-
-> **Running inside a Docker container?** The installer detects this automatically and connects to the host Docker socket instead of starting its own daemon. Make sure the host socket is accessible:
-> ```bash
-> # Run on the HOST machine before starting the installer
-> chmod 666 /var/run/docker.sock
-> ```
-> If running on a VPS or cloud panel that gives you a container terminal, it is recommended to install VitCam directly on the host via SSH instead.
 
 #### Fresh Ubuntu Server (logged in as root)
 
@@ -821,55 +799,19 @@ The **Analytics** dashboard gives you deep insight into activity across all your
 
 ## AI Models
 
-VitCam uses RF-DETR for object detection, with model weights stored as PyTorch `.pth` checkpoints in the `models/` directory.
+VitCam's AI detection works out of the box for common surveillance scenarios — people, vehicles, drones, and safety equipment. Detection models can be assigned per camera directly from the settings UI.
 
-> **Pre-trained models are available in VitCam Pro.** The community edition is BYOM (Bring Your Own Model) — you supply your own trained `.pth` weights. See the [Fine-Tuning](#fine-tuning-your-own-models) section below to train your own, or purchase a Pro license to access pre-trained surveillance models.
+### AI Model Marketplace *(coming soon)*
 
-### Bring Your Own Model (Community)
+We are building a marketplace of fine-tuned, purpose-built detection models available as add-ons — covering specialist use cases such as:
 
-VitCam supports any RF-DETR model saved as a PyTorch `.pth` checkpoint. To use your own:
+- **Drone / UAV detection** — airspace monitoring and restricted zone alerts
+- **PPE & safety compliance** — helmet, vest, and protective equipment detection
+- **Vehicle classification** — car, truck, motorcycle, bus, and licence plate recognition
+- **Crowd analytics** — people counting and density monitoring
+- **Custom verticals** — retail, agriculture, industrial, and more
 
-1. Place your `.pth` file in the `models/` directory
-2. Register it in the UI under **Settings → Models → Add Model**
-3. Assign it to a camera stream
-
-### Pre-Trained Models (Pro)
-
-Pro subscribers get access to ready-to-use pre-trained RF-DETR models via the VitCam model library:
-
-| Model | Classes | Notes |
-|-------|---------|-------|
-| `rfdetr_person.pth` | Person | General person detection and counting |
-| `rfdetr_vehicle.pth` | Car, truck, motorcycle, bus | Vehicle detection and classification |
-| `rfdetr_drone.pth` | Drone / UAV | Aerial drone detection |
-| `rfdetr_helmet.pth` | Safety helmet (on/off) | PPE compliance monitoring |
-
-Available at [vitcam.io](https://vitcam.io) *(coming soon)*.
-
-### Fine-Tuning Your Own Models
-
-See [docs/training.md](docs/training.md) for a guide on fine-tuning RF-DETR on your own dataset using Open Images V7 or custom annotations.
-
----
-
-## Open-Core Edition
-
-VitCam follows an **open-core model**:
-
-| Feature | Community (AGPL 3.0) | Pro |
-|---------|---------------------|-----|
-| Live WebRTC streaming | ✅ | ✅ |
-| Motion & continuous recording | ✅ | ✅ |
-| Analytics dashboard | ✅ | ✅ |
-| Self-hosted deployment | ✅ | ✅ |
-| Multi-camera (unlimited) | ✅ | ✅ |
-| Pre-trained surveillance models | ❌ | ✅ |
-| Specialty AI models (marketplace) | ❌ | ✅ |
-| Advanced alerting & webhooks | ❌ | ✅ |
-| Role-based access control (RBAC) | ❌ | ✅ |
-| Priority support | ❌ | ✅ |
-
-Pro features are available at [vitcam.io](https://vitcam.io) *(coming soon)*.
+Models will be available to purchase and install directly from the VitCam UI with a single click. Visit [vitcam.io](https://vitcam.io) to register your interest.
 
 ---
 
@@ -902,27 +844,9 @@ npm install
 npm run dev
 ```
 
-### Code Style
-
-- **Python:** Black + isort (`make lint`)
-- **TypeScript/React:** ESLint + Prettier (`npm run lint`)
-
 ### Note on Pull Requests
 
 Due to the complexity of coordinating changes across the AI pipeline, streaming server, and frontend, pull requests are reviewed carefully and may take time. Please open an issue first for any significant feature work — this avoids duplicate effort and helps ensure the change aligns with the project roadmap.
-
----
-
-## Roadmap
-
-- [ ] AI Model Marketplace (specialty detection models)
-- [ ] Mobile app (iOS / Android)
-- [ ] Edge deployment support (Jetson Nano / Raspberry Pi)
-- [ ] ONVIF camera auto-discovery
-- [ ] Face blurring / privacy masking
-- [ ] Webhook integrations (Slack, Discord, email alerts)
-- [ ] Multi-tenant / RBAC support (Pro)
-- [ ] Cloud-managed option (Pro)
 
 ---
 
