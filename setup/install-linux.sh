@@ -151,8 +151,25 @@ if $IN_CONTAINER; then
   fi
   success "Docker connected via host socket."
 else
-  # Native host: start daemon and wait
+  # Native host: install, configure and start daemon
+  if ! command -v docker >/dev/null; then
+    info "Installing Docker Engine..."
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+  else
+    success "Docker already installed: $(docker --version)"
+  fi
+
+  # Add user to docker group and activate immediately
   usermod -aG docker "$RUN_AS" 2>/dev/null || true
+  usermod -aG docker root 2>/dev/null || true
+
+  # Activate docker group in current session without logout
+  # newgrp starts a subshell so we use sg instead to stay in the same script flow
+  if command -v newgrp >/dev/null 2>&1; then
+    newgrp docker 2>/dev/null || true
+  fi
+
   systemctl enable docker 2>/dev/null || true
   systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true
 
@@ -163,7 +180,8 @@ else
     sleep 3
   done
   echo ""
-  docker info >/dev/null 2>&1 ||     error "Docker daemon did not start. Check: journalctl -u docker --no-pager | tail -20"
+  docker info >/dev/null 2>&1 || \
+    error "Docker daemon did not start. Check: journalctl -u docker --no-pager | tail -20"
 fi
 
 success "Docker $(docker --version) ready."
