@@ -137,7 +137,7 @@ header "Step 3 / 10 -- Docker Engine"
 if ! command -v docker >/dev/null; then
   info "Installing Docker Engine..."
   curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-  sudo sh /tmp/get-docker.sh
+  sudo sh /tmp/get-docker.sh 2>&1 | grep -v "^$" | grep -v "^+" || true
 fi
 
 # Ensure user is in docker group
@@ -146,36 +146,47 @@ if ! groups "$USER" | grep -q docker; then
   warn "Added $USER to docker group."
 fi
 
-# Detect init system -- systemd not available in WSL2 or containers
-if [[ -d /run/systemd/system ]] && systemctl is-system-running --quiet 2>/dev/null; then
-  # Full systemd available (native Ubuntu server or desktop)
-  sudo systemctl start docker
-  sudo systemctl enable docker
-  success "Docker service started and enabled via systemd."
-elif command -v service >/dev/null 2>&1; then
-  # SysV init fallback (WSL1, some minimal installs)
-  sudo service docker start || true
-  success "Docker service started via SysV init."
-else
-  # No init system (WSL2 without systemd, Docker-in-Docker)
-  # Start dockerd directly in background if not already running
+# Start Docker daemon -- try all available methods
+_docker_start() {
+  if [[ -d /run/systemd/system ]] && systemctl list-units --type=service 2>/dev/null | grep -q docker; then
+    sudo systemctl start docker 2>/dev/null || true
+    sudo systemctl enable docker 2>/dev/null || true
+  elif command -v service >/dev/null 2>&1; then
+    sudo service docker start 2>/dev/null || true
+  else
+    # Start dockerd directly as background process
+    if ! sudo docker info >/dev/null 2>&1; then
+      warn "Starting dockerd directly in background..."
+      sudo dockerd > /tmp/dockerd.log 2>&1 &
+    fi
+  fi
+}
+
+_docker_start
+
+# Wait up to 60 seconds for Docker daemon to be ready
+info "Waiting for Docker daemon to be ready..."
+DOCKER_READY=false
+for i in $(seq 1 24); do
+  if sudo docker info >/dev/null 2>&1; then
+    DOCKER_READY=true
+    break
+  fi
+  echo -n "."
+  sleep 3
+done
+echo ""
+
+if ! $DOCKER_READY; then
+  # One more attempt -- try starting again then wait
+  warn "Docker not ready yet -- retrying start..."
+  _docker_start
+  sleep 10
   if ! sudo docker info >/dev/null 2>&1; then
-    warn "No init system detected -- starting dockerd directly..."
-    sudo dockerd > /tmp/dockerd.log 2>&1 &
-    sleep 5
+    error "Docker daemon failed to start. Check logs with: sudo journalctl -u docker --no-pager | tail -20\nOr try: sudo dockerd &"
   fi
 fi
 
-# Verify docker is accessible
-if ! sudo docker info >/dev/null 2>&1; then
-  warn "Docker socket not accessible. If running in WSL2, enable systemd in /etc/wsl.conf:"
-  warn "  [boot]"
-  warn "  systemd=true"
-  warn "Then restart WSL2 with: wsl --shutdown"
-fi
-
-# Always use sudo for docker to avoid socket permission issues
-# (group membership may not be active in current session)
 success "Docker $(sudo docker --version) ready."
 
 # -- Step 3: Node.js ----------------------------------------------------------
@@ -238,23 +249,39 @@ sudo mkdir -p volumes/logs
 sudo chown -R "$USER":"$USER" volumes/
 success "Storage directories ready."
 
-info "Pulling latest Supabase images..."
+# Double-check Docker is still responsive before pulling images
+if ! sudo docker info >/dev/null 2>&1; then
+  warn "Docker daemon not responding -- attempting restart..."
+  sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || \
+    { sudo dockerd > /tmp/dockerd.log 2>&1 & sleep 8; }
+  sudo docker info >/dev/null 2>&1 || error "Docker daemon is not running. Check: sudo journalctl -u docker --no-pager | tail -20"
+fi
+
+info "Pulling latest Supabase images (this may take several minutes on first run)..."
 sudo docker compose pull
 
-info "Starting Supabase containers (first run may take several minutes)..."
+info "Starting Supabase containers..."
 sudo docker compose up --detach
 
 # Wait for Supabase Studio to be healthy
 info "Waiting for Supabase Studio to be ready..."
+SUPABASE_READY=false
 for i in $(seq 1 36); do
   if curl -sf "http://localhost:$SUPABASE_PORT" >/dev/null 2>&1; then
+    SUPABASE_READY=true
     break
   fi
   echo -n "."
   sleep 5
 done
 echo ""
-success "Supabase running at http://localhost:$SUPABASE_PORT"
+
+if ! $SUPABASE_READY; then
+  warn "Supabase Studio did not respond at http://localhost:$SUPABASE_PORT within 3 minutes."
+  warn "It may still be starting. Check: sudo docker compose ps"
+else
+  success "Supabase running at http://localhost:$SUPABASE_PORT"
+fi
 
 # Apply DB schema via docker exec -- no psql required on host
 info "Applying database schema..."
