@@ -200,40 +200,53 @@ VitCam is composed of two main services:
 
 ### Quick Start (Ubuntu)
 
-The fastest way to get VitCam running on a fresh Ubuntu machine.
+The installer runs as **root** and handles everything automatically — Docker, Supabase, Python, nginx, and systemd services. No user switching required.
 
-> **Fresh server with no sudo user?** On a brand-new Ubuntu server, log in as root first and run these commands in order:
+> **Running inside a Docker container?** The installer detects this automatically and connects to the host Docker socket instead of starting its own daemon. Make sure the host socket is accessible:
 > ```bash
-> # Step 1: Update and install git
-> apt update && apt install -y git
->
-> # Step 2: Clone the repo
-> git clone https://github.com/scwsoft/vitcam.git
->
-> # Step 3: Run the installer as root
-> bash vitcam/setup/install-linux.sh
+> # Run on the HOST machine before starting the installer
+> chmod 666 /var/run/docker.sock
 > ```
+> If running on a VPS or cloud panel that gives you a container terminal, it is recommended to install VitCam directly on the host via SSH instead.
 
-For a standard Ubuntu install where your user already has sudo:
+#### Fresh Ubuntu Server (logged in as root)
 
 ```bash
-sudo apt update
-sudo apt install -y git
+apt update && apt install -y git
 git clone https://github.com/scwsoft/vitcam.git
-cd vitcam/setup
-sudo bash install-linux.sh
+bash vitcam/setup/install-linux.sh
+```
+
+#### Standard Ubuntu (user with sudo)
+
+```bash
+sudo apt update && sudo apt install -y git
+git clone https://github.com/scwsoft/vitcam.git
+sudo bash vitcam/setup/install-linux.sh
 ```
 
 The installer will automatically:
 
-1. Install system dependencies and NVIDIA CUDA drivers (if a GPU is detected)
-2. Install Docker, Node.js, and clone the repo
-3. Set up Supabase via Docker Compose and apply the database schema
-4. Prompt you to update your `.env` files with Supabase keys
-5. Install Python via pyenv and all backend dependencies
-6. Build the frontend and deploy via nginx + systemd services (auto-start on reboot)
+1. Install system dependencies (ffmpeg, build tools, nginx)
+2. Detect and install NVIDIA CUDA drivers if a GPU is present — falls back to CPU mode if not
+3. Install and start Docker Engine (or connect to host Docker socket if inside a container)
+4. Install Node.js 22
+5. Clone and start Supabase via Docker Compose, apply the database schema
+6. Pause and prompt you to update your `.env` files with Supabase keys
+7. Install Python 3.10 via pyenv and all backend dependencies
+8. Build the Next.js frontend and deploy via nginx (port 80) + systemd services (auto-start on reboot)
 
-Once complete, open your browser at `http://localhost:3000`. Open **Supabase Studio at `http://localhost:8000` → Authentication → Users** to create your first login account.
+Once complete, open **Supabase Studio at `http://localhost:8000`** — log in with username `supabase` and password `this_password_is_insecure_and_should_be_updated`. Go to **Authentication → Users** to create your VitCam login account, then open `http://localhost:3000`.
+
+**Service management after install:**
+
+```bash
+systemctl status vitcam-frontend
+systemctl status vitcam-server
+journalctl -u vitcam-server -f      # live server logs
+journalctl -u vitcam-frontend -f    # live frontend logs
+systemctl restart vitcam-server
+```
 
 ---
 
