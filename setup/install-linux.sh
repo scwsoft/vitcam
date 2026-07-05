@@ -16,9 +16,9 @@ FRONTEND_PORT=3000
 SUPABASE_PORT=8000
 PYTHON_VERSION="3.10.11"
 
-# The user that will own the VitCam files and run the services
-# Defaults to the user who invoked sudo; falls back to current user
-RUN_AS="${SUDO_USER:-$USER}"
+# Resolve the user who will own VitCam files and run the services
+# SUDO_USER is set when running via sudo; fall back to whoami
+RUN_AS="${SUDO_USER:-$(whoami)}"
 RUN_HOME=$(eval echo "~$RUN_AS")
 
 # -- Colours ------------------------------------------------------------------
