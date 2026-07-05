@@ -137,15 +137,52 @@ https://download.docker.com/linux/ubuntu $OS_CODENAME stable" \
     success "Docker CLI already present: $(docker --version)"
   fi
 
-  # Fix socket permissions so container process can access host daemon
-  if [[ -S /var/run/docker.sock ]]; then
+  # Try multiple approaches to connect to host Docker socket
+  DOCKER_CONNECTED=false
+
+  for SOCK in /var/run/docker.sock /run/docker.sock; do
+    if [[ -S "$SOCK" ]]; then
+      # Try fixing permissions
+      chmod 666 "$SOCK" 2>/dev/null || true
+      chgrp docker "$SOCK" 2>/dev/null || true
+      # Test with explicit socket path
+      if DOCKER_HOST="unix://$SOCK" docker info >/dev/null 2>&1; then
+        export DOCKER_HOST="unix://$SOCK"
+        DOCKER_CONNECTED=true
+        success "Docker connected via $SOCK"
+        break
+      fi
+    fi
+  done
+
+  # Still not connected -- try adding root to docker group and retry
+  if ! $DOCKER_CONNECTED; then
+    if getent group docker >/dev/null 2>&1; then
+      usermod -aG docker root 2>/dev/null || true
+    else
+      groupadd docker 2>/dev/null || true
+      usermod -aG docker root 2>/dev/null || true
+    fi
     chmod 666 /var/run/docker.sock 2>/dev/null || true
+    if docker info >/dev/null 2>&1; then
+      DOCKER_CONNECTED=true
+      success "Docker connected via host socket."
+    fi
   fi
 
-  # Test connectivity to host Docker daemon
-  docker info >/dev/null 2>&1 || \
-    error "Cannot connect to host Docker socket.\nOn the HOST machine run: chmod 666 /var/run/docker.sock\nOr install VitCam directly on the host via SSH."
-  success "Docker connected via host socket."
+  if ! $DOCKER_CONNECTED; then
+    echo ""
+    echo -e "${RED}[X] Cannot connect to host Docker socket.${RESET}"
+    echo ""
+    echo -e "  The Docker socket exists but this container cannot access it."
+    echo -e "  Run this on the ${BOLD}HOST machine${RESET} then re-run the installer:"
+    echo ""
+    echo -e "    ${BOLD}chmod 666 /var/run/docker.sock${RESET}"
+    echo ""
+    echo -e "  Alternatively, install VitCam directly on the host via SSH"
+    echo -e "  instead of using a container web terminal."
+    exit 1
+  fi
 
 else
   # Native host install -- same approach as Raspberry Pi installer
