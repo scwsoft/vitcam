@@ -14,7 +14,7 @@ REPO="https://github.com/scwsoft/vitcam.git"
 
 SERVER_PORT=8765
 FRONTEND_PORT=3000
-SUPABASE_PORT=54323
+SUPABASE_PORT=8000
 PYTHON_VERSION="3.10.11"
 
 # -- Colours ------------------------------------------------------------------
@@ -31,16 +31,34 @@ header()  { echo -e "\n${BOLD}${CYAN}== $* ==${RESET}\n"; }
 header "VitCam Installer -- Ubuntu / Debian"
 
 if [[ $EUID -eq 0 ]]; then
-  error "Do not run as root. Run as a normal user with sudo access."
+  error "Do not run as root. Run as a normal user with sudo access. See setup/create-user.sh to create one."
 fi
 
-command -v sudo >/dev/null || error "sudo is required but not found."
+# Check sudo is available and current user has sudo privileges
+if ! command -v sudo >/dev/null; then
+  echo -e "${RED}[X]${RESET} sudo is not installed or not on PATH."
+  echo ""
+  echo -e "  Log in as root and run the following to set up a sudo user:"
+  echo -e "    ${BOLD}bash setup/create-user.sh <username>${RESET}"
+  echo -e "  Then log in as that user and re-run this installer."
+  exit 1
+fi
+
+if ! sudo -n true 2>/dev/null; then
+  echo -e "${RED}[X]${RESET} Current user '${USER}' does not have sudo privileges."
+  echo ""
+  echo -e "  Log in as root and run the following to grant sudo access:"
+  echo -e "    ${BOLD}bash setup/create-user.sh <username>${RESET}"
+  echo -e "  Then log in as that user and re-run this installer."
+  exit 1
+fi
+
 info "VitCam directory: $VITCAM_DIR"
 
 # -- Step 1: System dependencies ----------------------------------------------
 header "Step 1 / 10 -- System dependencies"
 
-sudo apt-get update -qq
+sudo apt update -qq
 sudo apt-get upgrade -y -qq
 sudo apt-get install -y -qq \
   git curl wget build-essential libssl-dev zlib1g-dev libbz2-dev \
@@ -128,8 +146,33 @@ if ! groups "$USER" | grep -q docker; then
   warn "Added $USER to docker group."
 fi
 
-sudo systemctl start docker
-sudo systemctl enable docker
+# Detect init system -- systemd not available in WSL2 or containers
+if [[ -d /run/systemd/system ]] && systemctl is-system-running --quiet 2>/dev/null; then
+  # Full systemd available (native Ubuntu server or desktop)
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  success "Docker service started and enabled via systemd."
+elif command -v service >/dev/null 2>&1; then
+  # SysV init fallback (WSL1, some minimal installs)
+  sudo service docker start || true
+  success "Docker service started via SysV init."
+else
+  # No init system (WSL2 without systemd, Docker-in-Docker)
+  # Start dockerd directly in background if not already running
+  if ! sudo docker info >/dev/null 2>&1; then
+    warn "No init system detected -- starting dockerd directly..."
+    sudo dockerd > /tmp/dockerd.log 2>&1 &
+    sleep 5
+  fi
+fi
+
+# Verify docker is accessible
+if ! sudo docker info >/dev/null 2>&1; then
+  warn "Docker socket not accessible. If running in WSL2, enable systemd in /etc/wsl.conf:"
+  warn "  [boot]"
+  warn "  systemd=true"
+  warn "Then restart WSL2 with: wsl --shutdown"
+fi
 
 # Always use sudo for docker to avoid socket permission issues
 # (group membership may not be active in current session)
@@ -236,19 +279,29 @@ fi
 header "Step 7 / 10 -- Configure .env files"
 
 echo ""
-echo -e "${YELLOW}  ACTION REQUIRED -- Set your Supabase keys in the .env files:${RESET}"
+echo -e "${YELLOW}  ACTION REQUIRED -- Configure Supabase and update .env files:${RESET}"
 echo -e "  ----------------------------------------------------------------"
-echo -e "  1. Open Supabase Studio -> Project Settings -> API:"
+echo -e "  1. Open Supabase Studio in your browser:"
 echo -e "     ${CYAN}http://localhost:$SUPABASE_PORT${RESET}"
-echo -e "     Copy the URL and anon public key"
 echo ""
-echo -e "  2. Edit and update NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY:"
+echo -e "     Login with the default credentials:"
+echo -e "     ${BOLD}Username:${RESET} supabase"
+echo -e "     ${BOLD}Password:${RESET} this_password_is_insecure_and_should_be_updated"
+echo -e "     ${YELLOW}NOTE: Do NOT change this password after first login${RESET}"
+echo ""
+echo -e "  2. Go to Authentication -> Users -> Add User"
+echo -e "     Add your VitCam login account and enable Auto Confirm"
+echo ""
+echo -e "  3. Go to Project Settings -> API"
+echo -e "     Copy the ${BOLD}URL${RESET} and ${BOLD}anon public${RESET} key"
+echo ""
+echo -e "  4. Edit and update NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY:"
 echo -e "     ${CYAN}$VITCAM_DIR/frontend/.env${RESET}"
 echo ""
-echo -e "  3. Edit and update SUPABASE_URL and SUPABASE_KEY:"
+echo -e "  5. Edit and update SUPABASE_URL and SUPABASE_KEY:"
 echo -e "     ${CYAN}$VITCAM_DIR/server/.env${RESET}"
 echo ""
-echo -e "${YELLOW}  Press ENTER once you have updated both .env files...${RESET}"
+echo -e "${YELLOW}  Press ENTER once you have completed all steps above...${RESET}"
 read -r
 
 success ".env configuration step complete."
@@ -332,8 +385,16 @@ NGINXCONF
 
 sudo ln -sf /etc/nginx/sites-available/vitcam /etc/nginx/sites-enabled/vitcam
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t && sudo systemctl reload nginx
-sudo systemctl enable nginx
+sudo nginx -t
+
+if [[ -d /run/systemd/system ]] && systemctl is-system-running --quiet 2>/dev/null; then
+  sudo systemctl reload nginx
+  sudo systemctl enable nginx
+  success "nginx configured and enabled via systemd."
+else
+  sudo service nginx restart 2>/dev/null || sudo nginx || true
+  warn "systemd not available -- nginx started directly. It will not auto-start on reboot."
+fi
 success "nginx configured -- frontend proxied on port 80."
 
 # Frontend systemd service
@@ -358,11 +419,6 @@ Environment=PORT=${FRONTEND_PORT}
 WantedBy=multi-user.target
 SVCCONF
 
-sudo systemctl daemon-reload
-sudo systemctl enable vitcam-frontend
-sudo systemctl restart vitcam-frontend
-success "vitcam-frontend service enabled and started."
-
 # Backend systemd service
 PYTHON_BIN="$(pyenv which python)"
 
@@ -384,10 +440,28 @@ EnvironmentFile=${VITCAM_DIR}/server/.env
 WantedBy=multi-user.target
 SVCCONF
 
-sudo systemctl daemon-reload
-sudo systemctl enable vitcam-server
-sudo systemctl restart vitcam-server
-success "vitcam-server service enabled and started."
+if [[ -d /run/systemd/system ]] && systemctl is-system-running --quiet 2>/dev/null; then
+  sudo systemctl daemon-reload
+  sudo systemctl enable vitcam-frontend
+  sudo systemctl restart vitcam-frontend
+  success "vitcam-frontend service enabled and started."
+  sudo systemctl daemon-reload
+  sudo systemctl enable vitcam-server
+  sudo systemctl restart vitcam-server
+  success "vitcam-server service enabled and started."
+else
+  warn "systemd not available -- starting services directly in background."
+  warn "Services will NOT auto-start on reboot in this environment."
+  warn "To enable systemd on WSL2, add to /etc/wsl.conf:"
+  warn "  [boot]"
+  warn "  systemd=true"
+  warn "Then run: wsl --shutdown"
+  # Start frontend and backend directly as background processes
+  cd "$VITCAM_DIR/frontend" && nohup npm start > /tmp/vitcam-frontend.log 2>&1 &
+  success "vitcam-frontend started (log: /tmp/vitcam-frontend.log)"
+  cd "$VITCAM_DIR/server" && nohup "$PYTHON_BIN" main.py > /tmp/vitcam-server.log 2>&1 &
+  success "vitcam-server started (log: /tmp/vitcam-server.log)"
+fi
 
 # -- Done ---------------------------------------------------------------------
 echo ""
