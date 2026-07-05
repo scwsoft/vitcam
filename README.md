@@ -202,17 +202,24 @@ VitCam is composed of two main services:
 
 The fastest way to get VitCam running on a fresh Ubuntu machine.
 
-> **Fresh server with no sudo user?** On a brand-new Ubuntu server where your current user doesn't have sudo privileges yet, log in as root first and run:
+> **Fresh server with no sudo user?** On a brand-new Ubuntu server, log in as root first and run these commands in order:
 > ```bash
+> # Step 1: Update and install git
 > apt update && apt install -y git
-> git clone https://github.com/scwsoft/vitcam.git
-> bash vitcam/setup/create-user.sh <username>
+>
+> # Step 2: Create your user and grant sudo access
+> adduser <username>
+> usermod -aG sudo <username>
+>
+> # Step 3: Switch to the new user
 > su - <username>
+>
+> # Step 4: Clone the repo and run the installer
+> git clone https://github.com/scwsoft/vitcam.git
 > cd vitcam/setup
 > chmod +x install-linux.sh
 > ./install-linux.sh
 > ```
-> `create-user.sh` creates the user, grants sudo access, adds them to the docker group, and tells you exactly what to run next.
 
 For a standard Ubuntu install where your user already has sudo:
 
