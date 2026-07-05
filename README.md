@@ -207,18 +207,11 @@ The fastest way to get VitCam running on a fresh Ubuntu machine.
 > # Step 1: Update and install git
 > apt update && apt install -y git
 >
-> # Step 2: Create your user and grant sudo access
-> adduser <username>
-> usermod -aG sudo <username>
->
-> # Step 3: Switch to the new user
-> su - <username>
->
-> # Step 4: Clone the repo and run the installer
+> # Step 2: Clone the repo
 > git clone https://github.com/scwsoft/vitcam.git
-> cd vitcam/setup
-> chmod +x install-linux.sh
-> ./install-linux.sh
+>
+> # Step 3: Run the installer as root
+> bash vitcam/setup/install-linux.sh
 > ```
 
 For a standard Ubuntu install where your user already has sudo:
@@ -228,8 +221,7 @@ sudo apt update
 sudo apt install -y git
 git clone https://github.com/scwsoft/vitcam.git
 cd vitcam/setup
-chmod +x install-linux.sh
-./install-linux.sh
+sudo bash install-linux.sh
 ```
 
 The installer will automatically:
