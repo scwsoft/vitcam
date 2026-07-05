@@ -110,27 +110,48 @@ success "GPU/CPU setup complete."
 # -- Step 3 / 9: Docker -------------------------------------------------------
 header "Step 3 / 9 -- Docker Engine"
 
-if ! command -v docker >/dev/null; then
-  info "Installing Docker Engine..."
-  curl -fsSL https://get.docker.com | sh
+# Detect if running inside a Docker container
+IN_CONTAINER=false
+if [[ -f /.dockerenv ]] || grep -qa 'docker\|lxc\|containerd' /proc/1/cgroup 2>/dev/null; then
+  IN_CONTAINER=true
+  warn "Running inside a container -- will use host Docker socket if available."
 fi
 
-# Add the run-as user to docker group so they can use docker without sudo
-usermod -aG docker "$RUN_AS"
+if $IN_CONTAINER; then
+  # Inside a container: check if host docker socket is mounted
+  if docker info >/dev/null 2>&1; then
+    success "Docker accessible via host socket."
+  elif [[ -S /var/run/docker.sock ]]; then
+    chmod 666 /var/run/docker.sock 2>/dev/null || true
+    docker info >/dev/null 2>&1 || error "Docker socket exists but is not accessible.\nMount the host socket when starting this container:\n  docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
+  else
+    error "Running inside a container with no Docker socket.\nTo use Docker inside this container, run it with:\n  docker run -v /var/run/docker.sock:/var/run/docker.sock ...\nOr install VitCam directly on the host machine instead."
+  fi
+else
+  # Native host install
+  if ! command -v docker >/dev/null; then
+    info "Installing Docker Engine..."
+    curl -fsSL https://get.docker.com | sh
+  fi
 
-# Start Docker daemon
-systemctl enable docker 2>/dev/null || true
-systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true
+  # Add the run-as user to docker group
+  usermod -aG docker "$RUN_AS" 2>/dev/null || true
 
-# Wait up to 60s for Docker to be ready
-info "Waiting for Docker daemon..."
-for i in $(seq 1 20); do
-  docker info >/dev/null 2>&1 && break
-  echo -n "."
-  sleep 3
-done
-echo ""
-docker info >/dev/null 2>&1 || error "Docker daemon did not start. Check: journalctl -u docker --no-pager | tail -20"
+  # Start Docker daemon
+  systemctl enable docker 2>/dev/null || true
+  systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true
+
+  # Wait up to 60s for Docker to be ready
+  info "Waiting for Docker daemon..."
+  for i in $(seq 1 20); do
+    docker info >/dev/null 2>&1 && break
+    echo -n "."
+    sleep 3
+  done
+  echo ""
+  docker info >/dev/null 2>&1 || error "Docker daemon did not start.\nCheck: journalctl -u docker --no-pager | tail -20"
+fi
+
 success "Docker $(docker --version) ready."
 
 # -- Step 4 / 9: Node.js ------------------------------------------------------
