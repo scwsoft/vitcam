@@ -811,7 +811,7 @@ We are building a marketplace of fine-tuned, purpose-built detection models avai
 - **Crowd analytics** — people counting and density monitoring
 - **Custom verticals** — retail, agriculture, industrial, and more
 
-Models will be available to purchase and install directly from the VitCam UI with a single click. Visit [vitcam.io](https://vitcam.io) to register your interest.
+Models will be available to purchase and install directly from the VitCam UI with a single click. Visit [vitcam.net](https://vitcam.net) to register your interest.
 
 ---
 
