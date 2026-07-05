@@ -114,94 +114,48 @@ header "Step 3 / 9 -- Docker Engine"
 IN_CONTAINER=false
 if [[ -f /.dockerenv ]] || grep -qa 'docker\|lxc\|containerd' /proc/1/cgroup 2>/dev/null; then
   IN_CONTAINER=true
-  warn "Running inside a container -- will connect to host Docker socket."
+  warn "Running inside a container."
 fi
 
-if $IN_CONTAINER; then
-  # Inside a container: install Docker CLI only to talk to host daemon via socket
-  if ! command -v docker >/dev/null; then
-    info "Installing Docker CLI..."
-    apt-get install -y -qq ca-certificates curl gnupg lsb-release
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    OS_CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-$(lsb_release -cs)}")
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-https://download.docker.com/linux/ubuntu $OS_CODENAME stable" \
-      > /etc/apt/sources.list.d/docker.list
-    apt-get update -qq
-    apt-get install -y -qq docker-ce-cli docker-compose-plugin
-    success "Docker CLI installed."
+# Install Docker Engine (or CLI only if inside container)
+if ! command -v docker >/dev/null; then
+  if $IN_CONTAINER; then
+    info "Installing Docker CLI to connect to host daemon..."
+    apt-get install -y -qq docker.io
   else
-    success "Docker CLI already present: $(docker --version)"
-  fi
-
-  # Try multiple approaches to connect to host Docker socket
-  DOCKER_CONNECTED=false
-
-  for SOCK in /var/run/docker.sock /run/docker.sock; do
-    if [[ -S "$SOCK" ]]; then
-      # Try fixing permissions
-      chmod 666 "$SOCK" 2>/dev/null || true
-      chgrp docker "$SOCK" 2>/dev/null || true
-      # Test with explicit socket path
-      if DOCKER_HOST="unix://$SOCK" docker info >/dev/null 2>&1; then
-        export DOCKER_HOST="unix://$SOCK"
-        DOCKER_CONNECTED=true
-        success "Docker connected via $SOCK"
-        break
-      fi
-    fi
-  done
-
-  # Still not connected -- try adding root to docker group and retry
-  if ! $DOCKER_CONNECTED; then
-    if getent group docker >/dev/null 2>&1; then
-      usermod -aG docker root 2>/dev/null || true
-    else
-      groupadd docker 2>/dev/null || true
-      usermod -aG docker root 2>/dev/null || true
-    fi
-    chmod 666 /var/run/docker.sock 2>/dev/null || true
-    if docker info >/dev/null 2>&1; then
-      DOCKER_CONNECTED=true
-      success "Docker connected via host socket."
-    fi
-  fi
-
-  if ! $DOCKER_CONNECTED; then
-    echo ""
-    echo -e "${RED}[X] Cannot connect to host Docker socket.${RESET}"
-    echo ""
-    echo -e "  The Docker socket exists but this container cannot access it."
-    echo -e "  Run this on the ${BOLD}HOST machine${RESET} then re-run the installer:"
-    echo ""
-    echo -e "    ${BOLD}chmod 666 /var/run/docker.sock${RESET}"
-    echo ""
-    echo -e "  Alternatively, install VitCam directly on the host via SSH"
-    echo -e "  instead of using a container web terminal."
-    exit 1
-  fi
-
-else
-  # Native host install -- same approach as Raspberry Pi installer
-  if ! command -v docker >/dev/null; then
     info "Installing Docker Engine..."
     curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
     sh /tmp/get-docker.sh
-  else
-    success "Docker already installed: $(docker --version)"
   fi
+else
+  success "Docker already installed: $(docker --version)"
+fi
 
-  # Add run-as user to docker group
+# Set DOCKER_HOST explicitly so all docker commands use the correct socket
+# This works both inside containers and on native hosts
+export DOCKER_HOST="unix:///var/run/docker.sock"
+
+if $IN_CONTAINER; then
+  # Fix socket permissions from inside the container
+  if [[ -S /var/run/docker.sock ]]; then
+    chmod 666 /var/run/docker.sock 2>/dev/null || true
+  fi
+  # Test connection
+  if ! DOCKER_HOST="unix:///var/run/docker.sock" docker info >/dev/null 2>&1; then
+    echo ""
+    echo -e "${RED}[X] Cannot connect to host Docker socket.${RESET}"
+    echo -e "    Run this on the HOST machine then re-run the installer:"
+    echo -e "      ${BOLD}chmod 666 /var/run/docker.sock${RESET}"
+    echo ""
+    exit 1
+  fi
+  success "Docker connected via host socket."
+else
+  # Native host: start daemon and wait
   usermod -aG docker "$RUN_AS" 2>/dev/null || true
-
-  # Start daemon via systemd or fallback to service
   systemctl enable docker 2>/dev/null || true
   systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true
 
-  # Wait up to 60s for Docker daemon to be ready
   info "Waiting for Docker daemon..."
   for i in $(seq 1 20); do
     docker info >/dev/null 2>&1 && break
@@ -209,8 +163,7 @@ else
     sleep 3
   done
   echo ""
-  docker info >/dev/null 2>&1 || \
-    error "Docker daemon did not start.\nCheck: journalctl -u docker --no-pager | tail -20"
+  docker info >/dev/null 2>&1 ||     error "Docker daemon did not start. Check: journalctl -u docker --no-pager | tail -20"
 fi
 
 success "Docker $(docker --version) ready."
