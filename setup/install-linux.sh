@@ -114,19 +114,36 @@ header "Step 3 / 9 -- Docker Engine"
 IN_CONTAINER=false
 if [[ -f /.dockerenv ]] || grep -qa 'docker\|lxc\|containerd' /proc/1/cgroup 2>/dev/null; then
   IN_CONTAINER=true
-  warn "Running inside a container -- will use host Docker socket if available."
+  warn "Running inside a container -- connecting to host Docker socket."
 fi
 
 if $IN_CONTAINER; then
-  # Inside a container: check if host docker socket is mounted
-  if docker info >/dev/null 2>&1; then
-    success "Docker accessible via host socket."
-  elif [[ -S /var/run/docker.sock ]]; then
+  # Fix socket permissions first
+  if [[ -S /var/run/docker.sock ]]; then
     chmod 666 /var/run/docker.sock 2>/dev/null || true
-    docker info >/dev/null 2>&1 || error "Docker socket exists but is not accessible.\nMount the host socket when starting this container:\n  docker run -v /var/run/docker.sock:/var/run/docker.sock ..."
-  else
-    error "Running inside a container with no Docker socket.\nTo use Docker inside this container, run it with:\n  docker run -v /var/run/docker.sock:/var/run/docker.sock ...\nOr install VitCam directly on the host machine instead."
   fi
+
+  # Install docker CLI if not present (to talk to host daemon via socket)
+  if ! command -v docker >/dev/null; then
+    info "Installing Docker CLI..."
+    apt-get install -y -qq ca-certificates curl gnupg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $OS_CODENAME stable" \
+      > /etc/apt/sources.list.d/docker.list
+    apt-get update -qq
+    apt-get install -y -qq docker-ce-cli docker-compose-plugin
+  fi
+
+  # Test Docker connectivity
+  if ! docker info >/dev/null 2>&1; then
+    error "Cannot connect to host Docker socket.\nStart this container with the socket mounted:\n  docker run -v /var/run/docker.sock:/var/run/docker.sock ...\nOr run VitCam directly on the host machine."
+  fi
+  success "Docker connected via host socket."
+
 else
   # Native host install
   if ! command -v docker >/dev/null; then
@@ -134,14 +151,10 @@ else
     curl -fsSL https://get.docker.com | sh
   fi
 
-  # Add the run-as user to docker group
   usermod -aG docker "$RUN_AS" 2>/dev/null || true
-
-  # Start Docker daemon
   systemctl enable docker 2>/dev/null || true
   systemctl start docker 2>/dev/null || service docker start 2>/dev/null || true
 
-  # Wait up to 60s for Docker to be ready
   info "Waiting for Docker daemon..."
   for i in $(seq 1 20); do
     docker info >/dev/null 2>&1 && break
