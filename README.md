@@ -884,11 +884,7 @@ GNU Affero General Public License for more details.
 VitCam is built on top of excellent open-source projects:
 
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
-- [DeepSORT](https://github.com/nwojke/deep_sort) — Multi-object tracking
-- [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
 - [Supabase](https://supabase.com) — Open-source Firebase alternative
-- [Next.js](https://nextjs.org) — React framework
 
 ---
 
-*Made with ❤️ in the Philippines*
