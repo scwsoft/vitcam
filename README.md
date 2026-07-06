@@ -737,7 +737,7 @@ Each camera can operate in one of two modes:
 | Mode | Description |
 |------|-------------|
 | **Standard NVR** (AI off) | Live streaming and continuous or motion-triggered recording with no AI processing. Lightweight — runs on any hardware. |
-| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, DeepSORT tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
+| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, object tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
 
 You can mix modes across cameras — for example, run AI detection on entrance cameras while keeping indoor cameras in standard NVR mode to save resources.
 
