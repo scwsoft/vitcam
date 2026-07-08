@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timezone
 from models.camera import CameraConfig
-from config.settings import COCO_CLASS_NAMES
+from config.settings import COCO_CLASS_NAMES,CUSTOM_CLASS_NAMES
 
 import cv2
 import io
@@ -81,7 +81,7 @@ class CameraPredictor:
             
             labels = []
             for class_id, confidence in zip(detections.class_id, detections.confidence):
-                class_name =  COCO_CLASS_NAMES[class_id] 
+                class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
                 labels.append(f"{class_name} {confidence:.2f}")
             
             annotated_frame = frame.copy()
@@ -367,7 +367,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             for i, (class_id, confidence) in enumerate(
                 zip(detections.class_id, detections.confidence)
             ):
-                class_name = COCO_CLASS_NAMES[class_id]
+                class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
                 labels.append(
                     self._build_detection_label(class_name, confidence, dwell_per_det[i])
                 )
@@ -486,7 +486,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 class_id = 0
 
             labels.append(
-                COCO_CLASS_NAMES[class_id] 
+                COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
             )
 
         return labels
@@ -806,7 +806,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     continue
 
                 class_name  = (
-                    COCO_CLASS_NAMES[class_id] 
+                    COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
                 )
 
                 # ── Update in-memory tracking state ───────────────────────────

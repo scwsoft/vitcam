@@ -101,6 +101,12 @@ class CameraPredictorFactory:
             elif camera_config.modelsize  == "Nano" and camera_config.detectiontype == 'Segmentation': 
                 model = RFDETRSegNano(device=device)
                 model.optimize_for_inference(compile=False) 
+            
+            elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
+                model =  RFDETRBase(device=device,
+                          pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
+                          pretrained=True)
+                model.optimize_for_inference(compile=False) 
         
             logger.info(f"Loading model {camera_config.modelsize} on device: {device}")
 
