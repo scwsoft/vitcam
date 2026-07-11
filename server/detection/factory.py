@@ -94,7 +94,6 @@ class CameraPredictorFactory:
             
             elif  camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':  
                 model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
-                model = YOLO("yolo26n_float32.tflite")
                 device = None
             
             

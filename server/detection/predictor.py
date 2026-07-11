@@ -336,14 +336,12 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         try:
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
-            class_index = 0
 
             if self.camera_config.modelsize =="Edge":
                 
              result = self.model(converted_image)[0]
              detections = sv.Detections.from_ultralytics(result)
-             class_index=+1
-           
+          
             else : 
              detections = self.model.predict(
              converted_image, threshold=self.confidence_threshold
@@ -352,7 +350,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             # ── 2. Class filter + confidence floor ────────────────────────────
             if self.detection_classes:
                 detections = detections[
-                    np.isin(detections.class_id + class_index, list(self.detection_classes))
+                    np.isin(detections.class_id, list(self.detection_classes))
                 ]
             detections = detections[detections.confidence >= self.confidence_threshold]
 
@@ -375,7 +373,15 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             for i, (class_id, confidence) in enumerate(
                 zip(detections.class_id, detections.confidence)
             ):
-                class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
+                # class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[str(class_id)]
+                
+                if self.model_size == "Edge" :
+                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
+                elif self.model_size == "Custom" :
+                  class_name =  CUSTOM_CLASS_NAMES[class_id]
+                else :
+                  class_name =  COCO_CLASS_NAMES[class_id]
+
                 labels.append(
                     self._build_detection_label(class_name, confidence, dwell_per_det[i])
                 )
@@ -813,9 +819,14 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 if tracker_id is None:
                     continue
 
-                class_name  = (
-                    COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[class_id]
-                )
+                if self.model_size == "Edge" :
+                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
+                elif self.model_size == "Custom" :
+                   class_name =  CUSTOM_CLASS_NAMES[class_id]
+                else :
+                   class_name =  COCO_CLASS_NAMES[class_id]
+ 
+
 
                 # ── Update in-memory tracking state ───────────────────────────
                 if tracker_id not in self.tracked_objects:
