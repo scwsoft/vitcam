@@ -10,7 +10,8 @@ from models.camera import CameraConfig
 from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
 from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano, RFDETRSegMedium, RFDETRSegSmall, RFDETRSegLarge,RFDETRSegNano
 from config.settings import settings
-from supabase import create_client, Client
+from supabase import create_client
+from ultralytics import YOLO
 
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,17 @@ class CameraPredictorFactory:
                 model = RFDETRNano(device=device)
                 model.optimize_for_inference(compile=False) 
             
+            elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
+                model =  RFDETRBase(device=device,
+                          pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
+                          pretrained=True)
+                model.optimize_for_inference(compile=False) 
+            
+            elif  camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':  
+                model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
+                model = YOLO("yolo26n_float32.tflite")
+                device = None
+            
             
             if camera_config.modelsize == "Large" and camera_config.detectiontype == 'Segmentation':
                 model = RFDETRSegLarge(device=device)
@@ -102,11 +114,6 @@ class CameraPredictorFactory:
                 model = RFDETRSegNano(device=device)
                 model.optimize_for_inference(compile=False) 
             
-            elif  camera_config.modelsize  == "Custom" and camera_config.detectiontype == 'BoundingBox':  
-                model =  RFDETRBase(device=device,
-                          pretrain_weights=(f"{settings.MODEL_CHECKPOINT_PATH}"),
-                          pretrained=True)
-                model.optimize_for_inference(compile=False) 
         
             logger.info(f"Loading model {camera_config.modelsize} on device: {device}")
 

@@ -336,15 +336,23 @@ class CameraPredictorWithAnalytics(CameraPredictor):
         try:
             # ── 1. Model inference ────────────────────────────────────────────
             converted_image = Image.fromarray(frame)
-      
-            detections = self.model.predict(
+            class_index = 0
+
+            if self.camera_config.modelsize =="Edge":
+                
+             result = self.model(converted_image)[0]
+             detections = sv.Detections.from_ultralytics(result)
+             class_index=+1
+           
+            else : 
+             detections = self.model.predict(
              converted_image, threshold=self.confidence_threshold
             )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
             if self.detection_classes:
                 detections = detections[
-                    np.isin(detections.class_id, list(self.detection_classes))
+                    np.isin(detections.class_id + class_index, list(self.detection_classes))
                 ]
             detections = detections[detections.confidence >= self.confidence_threshold]
 

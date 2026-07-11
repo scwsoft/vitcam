@@ -155,6 +155,7 @@ export const MODEL_SIZE_OPTIONS = [
   { value: 'Medium', label: 'Medium', description: 'Balanced accuracy and speed' },
   { value: 'Small',  label: 'Small',  description: 'Faster inference, good accuracy' },
   { value: 'Nano',   label: 'Nano',   description: 'Very fast, lightweight' },
+  { value: 'Edge',   label: 'Edge',   description: 'Optimised for edge devices' },
   { value: 'Custom',  label: 'Custom',   description: 'Fine-tuned model' }
 
   
