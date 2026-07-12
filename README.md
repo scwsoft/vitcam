@@ -1,7 +1,7 @@
 # <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
 > **Self-hosted, on-premises AI camera surveillance, video analytics, and NVR platform**
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE.md)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -502,7 +502,7 @@ The backend will be available at `http://localhost:8765`. Sign in at `http://loc
 
 ### Raspberry Pi (Debian Bookworm)
 
-VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit). There is no CUDA GPU on Raspberry Pi, so the backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
+VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit) with support for the **Google Coral USB TPU** for hardware-accelerated AI inference. Without the Coral TPU, the backend runs in CPU inference mode — suitable for single-camera setups.
 
 > **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS (64-bit, Debian Bookworm). A 64-bit OS is required.
 
@@ -515,7 +515,7 @@ chmod +x install-raspberry-pi.sh
 ./install-raspberry-pi.sh
 ```
 
-The installer handles Docker Engine, Node.js, Supabase (via Docker Compose), pyenv, Python 3.10, all dependencies, frontend build, nginx, and systemd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
+The installer handles everything: Docker Engine, Node.js, Supabase via Docker Compose, Google Coral USB TPU drivers, pyenv, Python 3.10, all dependencies, frontend build, nginx, and systemd services. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
 
 > On first run, compiling Python via pyenv on Raspberry Pi can take 10–20 minutes. This is normal.
 
@@ -528,9 +528,10 @@ sudo apt update && sudo apt upgrade -y
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
+newgrp docker
 ```
 
-> After adding your user to the `docker` group, **log out and back in** (or reboot) before running any `docker` commands.
+> After adding your user to the `docker` group, **log out and back in** (or reboot) if `docker` commands still require sudo.
 
 #### Step 2 — Install Node.js
 
@@ -562,67 +563,56 @@ docker compose up --detach
 #### Step 5 — Apply the Database Schema
 
 1. Open **Supabase Studio** at `http://localhost:8000`
-2. Navigate to the **SQL Editor**
-3. Open `dbschema.sql` from the root of your `vitcam` directory
-4. Paste its contents into the editor and click **Run**
+2. Log in — Username: `supabase` / Password: `this_password_is_insecure_and_should_be_updated`
+3. Navigate to **SQL Editor**
+4. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
+5. Paste its contents into the editor and click **Run**
 
 #### Step 6 — Create the First User
 
-1. In Supabase Studio, go to **Authentication → Users**
+1. In Supabase Studio go to **Authentication → Users**
 2. Click **Add User**, enter your email and password
 3. Set **Auto Confirm** to on so the account is immediately active
 
-#### Step 6b — Get Your Supabase URL and Anon Key (Raspberry Pi)
+#### Step 6b — Get Your Supabase URL and Anon Key
 
-You need these two values for both the frontend and server `.env` files.
+1. In Supabase Studio go to **Project Settings → API**
+2. Copy the **URL** and **anon public** key
 
-On Raspberry Pi, Supabase runs via Docker so the keys are set in the `supabase/docker/.env` file you copied earlier. Open it to find them:
+Then manually update these two files:
 
-```bash
-grep "ANON_KEY\|API_EXTERNAL_URL" ~/vitcam/supabase/docker/.env
-```
+- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
 
-This will print something like:
+#### Step 7 — Install Coral USB TPU Support
 
-```
-API_EXTERNAL_URL=http://localhost:8000
-ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-Alternatively, retrieve them from Supabase Studio:
-
-1. Open Supabase Studio at `http://localhost:8000`
-2. Go to **Project Settings → API**
-3. Copy the **URL** and **anon public** key
-
-Then add them to your config files:
-
-- **Frontend:** create or edit `vitcam/frontend/.env` and set:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-- **Server:** create or edit `vitcam/server/.env` and set:
-
-```env
-SUPABASE_URL=http://localhost:8000
-SUPABASE_KEY=your-anon-key
-```
-
-#### Step 7 — Build and Start the Frontend
-
-Open a new terminal and run:
+Add the Google Coral package repository:
 
 ```bash
-cd ~/vitcam/frontend
-npm install
-npm run build
-npm start
+echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
+  | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+  | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/google-coral-edgetpu.gpg
+
+sudo apt modernize-sources
+sudo apt-get update
 ```
 
-The frontend will be available at `http://localhost:3000`. Leave this terminal open, or set it up as a systemd service for auto-start on reboot.
+Install the Edge TPU runtime:
+
+```bash
+sudo apt-get install libedgetpu1-std    # standard clock (recommended, runs cooler)
+sudo apt-get install libedgetpu1-max    # max clock (faster, needs active cooling)
+```
+
+Verify the Coral USB TPU is detected:
+
+```bash
+lsusb
+```
+
+You should see a device with ID `1a6e:089a` or `18d1:9302` (labelled Global Unichip or Google).
 
 #### Step 8 — Set Up Python with pyenv
 
@@ -640,7 +630,7 @@ Install pyenv:
 curl https://pyenv.run | bash
 ```
 
-Add pyenv to your shell by appending the following lines to the end of `~/.bashrc`:
+Add pyenv to your shell — append to `~/.bashrc`:
 
 ```bash
 export PYENV_ROOT="$HOME/.pyenv"
@@ -655,17 +645,44 @@ Apply the changes:
 exec "$SHELL"
 ```
 
-#### Step 9 — Install Python and Start the Backend
+#### Step 9 — Install Python and Backend Dependencies
 
 ```bash
 pyenv install 3.10.11
 pyenv global 3.10.11
 cd ~/vitcam/server
 pip install -r requirements.txt
+```
+
+Install TFLite runtime and Coral inference support:
+
+```bash
+pip uninstall tensorflow tensorflow-aarch64
+pip install -U tflite-runtime
+pip install ultralytics
+```
+
+#### Step 10 — Build and Start the Frontend
+
+```bash
+cd ~/vitcam/frontend
+npm install
+npm run build
+npm start
+```
+
+The frontend will be available at `http://localhost:3000`.
+
+#### Step 11 — Start the Backend
+
+Open a new terminal tab:
+
+```bash
+cd ~/vitcam/server
 python main.py
 ```
 
-The backend will be available at `http://localhost:8765`. Leave this terminal open.
+The backend will be available at `http://localhost:8765`. Sign in at `http://localhost:3000` with the user you created in Step 6.
 
 ---
 
@@ -737,7 +754,7 @@ Each camera can operate in one of two modes:
 | Mode | Description |
 |------|-------------|
 | **Standard NVR** (AI off) | Live streaming and continuous or motion-triggered recording with no AI processing. Lightweight — runs on any hardware. |
-| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, object tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
+| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, DeepSORT tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
 
 You can mix modes across cameras — for example, run AI detection on entrance cameras while keeping indoor cameras in standard NVR mode to save resources.
 
@@ -811,7 +828,7 @@ We are building a marketplace of fine-tuned, purpose-built detection models avai
 - **Crowd analytics** — people counting and density monitoring
 - **Custom verticals** — retail, agriculture, industrial, and more
 
-Models will be available to purchase and install directly from the VitCam UI with a single click. Visit [vitcam.net](https://vitcam.net) to register your interest.
+Models will be available to purchase and install directly from the VitCam UI with a single click. Visit [vitcam.io](https://vitcam.io) to register your interest.
 
 ---
 
@@ -884,7 +901,11 @@ GNU Affero General Public License for more details.
 VitCam is built on top of excellent open-source projects:
 
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
+- [DeepSORT](https://github.com/nwojke/deep_sort) — Multi-object tracking
+- [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
 - [Supabase](https://supabase.com) — Open-source Firebase alternative
+- [Next.js](https://nextjs.org) — React framework
 
 ---
 
+*Made with ❤️ in the Philippines*
