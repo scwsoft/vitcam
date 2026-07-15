@@ -27,7 +27,7 @@ VitCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
   - [Windows Setup (Conda)](#windows-setup-conda)
   - [macOS Setup](#macos-setup)
-  - [Raspberry Pi (Debian Bookworm)](#raspberry-pi-debian-bookworm)
+  - [Raspberry Pi (Ubuntu 26.04 LTS)](#raspberry-pi-ubuntu-2604-lts)
 - [Configuration](#configuration)
 - [Screenshots](#screenshots)
 - [Usage](#usage)
@@ -160,7 +160,7 @@ VitCam pulls each stream and processes it locally. For on-premises cameras, no i
 
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Raspberry Pi OS 64-bit (Bookworm) |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Ubuntu 26.04 LTS (Raspberry Pi) |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
@@ -500,11 +500,11 @@ The backend will be available at `http://localhost:8765`. Sign in at `http://loc
 > docker compose -f docker-compose.yml -f docker-compose.s3.yml restart
 > ```
 
-### Raspberry Pi (Debian Bookworm)
+### Raspberry Pi (Ubuntu 26.04 LTS)
 
-VitCam runs on Raspberry Pi 4/5 with Debian Bookworm (64-bit) with support for the **Google Coral USB TPU** for hardware-accelerated AI inference. Without the Coral TPU, the backend runs in CPU inference mode — suitable for single-camera setups.
+VitCam runs on Raspberry Pi 4/5 with Ubuntu 26.04 LTS (64-bit) with support for the **Google Coral USB TPU** for hardware-accelerated AI inference. Without the Coral TPU, the backend runs in CPU inference mode — suitable for single-camera setups.
 
-> **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS (64-bit, Debian Bookworm). A 64-bit OS is required.
+> **Tested on:** Raspberry Pi 4B / 5 running Ubuntu 26.04 LTS (64-bit). A 64-bit OS is required.
 
 #### Option A — Automated Installer (recommended)
 
@@ -901,11 +901,9 @@ GNU Affero General Public License for more details.
 VitCam is built on top of excellent open-source projects:
 
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
-- [DeepSORT](https://github.com/nwojke/deep_sort) — Multi-object tracking
 - [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
 - [Supabase](https://supabase.com) — Open-source Firebase alternative
 - [Next.js](https://nextjs.org) — React framework
 
 ---
 
-*Made with ❤️ in the Philippines*
