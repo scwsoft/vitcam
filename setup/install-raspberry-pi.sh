@@ -379,6 +379,7 @@ ExecStart=${PYTHON_BIN} main.py
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=${VITCAM_DIR}/server/.env
+Environment="SUPABASE_URL=http://localhost:8000"
 
 [Install]
 WantedBy=multi-user.target
