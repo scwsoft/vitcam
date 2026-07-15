@@ -6,7 +6,7 @@ const supabase = createClient()
 
 /** Pick the right class map based on model size. */
 function getClassMap(modelsize?: string): typeof DETECTION_CLASSES | typeof CUSTOM_DETECTION_CLASSES {
-  return modelsize === 'Custom' ? CUSTOM_DETECTION_CLASSES : DETECTION_CLASSES
+  return modelsize === 'Custom' ? CUSTOM_DETECTION_CLASSES : modelsize === 'Edge' ? CUSTOM_DETECTION_CLASSES : DETECTION_CLASSES
 }
 
 export class CameraService {

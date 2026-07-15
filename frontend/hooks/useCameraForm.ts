@@ -9,7 +9,7 @@ const CUSTOM_CLASS_NAMES = Object.values(CUSTOM_DETECTION_CLASSES)
 
 /** Returns the full class list for a given modelsize. */
 function getDefaultClasses(modelsize: string): string[] {
-  return modelsize === 'Custom' ? [...CUSTOM_CLASS_NAMES] : [...STANDARD_CLASS_NAMES]
+  return modelsize === 'Custom' ? [...CUSTOM_CLASS_NAMES] : modelsize =='Edge' ? [...CUSTOM_CLASS_NAMES] : [...STANDARD_CLASS_NAMES ] 
 }
 
 export function useCameraForm(camera?: Camera | null, isEditing = false) {
