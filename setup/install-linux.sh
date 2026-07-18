@@ -475,6 +475,15 @@ success "Python $PYTHON_VERSION ready."
 # -- Step 9 / 10: Backend dependencies -----------------------------------------
 header "Step 9 / 10 -- Backend dependencies"
 
+# CRITICAL: use the pyenv interpreter by ABSOLUTE PATH, never the bare `pip`.
+# If pyenv shims aren't active in the su login shell, bare `pip` resolves to
+# the SYSTEM Python and collides with apt-managed packages (python3-jwt,
+# python3-pyparsing), causing "Cannot uninstall PyJWT" / pyparsing errors.
+PY_BIN="$RUN_HOME/.pyenv/versions/$PYTHON_VERSION/bin/python"
+
+[[ -x "$PY_BIN" ]] || error "pyenv Python not found at $PY_BIN -- Step 8 may have failed."
+info "Using interpreter: $PY_BIN"
+
 # Install PyTorch FIRST with the wheel index matching the inference mode.
 # CPU wheels are ~10x smaller than the default CUDA wheels; CUDA wheels bundle
 # their own CUDA runtime so they work even without the full toolkit installed.
@@ -487,31 +496,25 @@ else
 fi
 
 su - "$RUN_AS" -c "
-  export PYENV_ROOT=\"$RUN_HOME/.pyenv\"
-  export PATH=\"\$PYENV_ROOT/bin:\$PATH\"
-  eval \"\$(pyenv init -)\" 2>/dev/null || true
   cd '$VITCAM_DIR/server'
 
-  # Retry pip on unstable connections
+  # Retry pip on unstable connections -- always via the absolute pyenv python
   pip_retry() {
     for attempt in 1 2 3; do
-      pip install --retries 5 --timeout 60 \"\$@\" && return 0
+      '$PY_BIN' -m pip install --retries 5 --timeout 60 \"\$@\" && return 0
       echo '[VitCam] pip failed (attempt '\$attempt'/3) -- retrying in 10s...'
       sleep 10
     done
     return 1
   }
 
+  '$PY_BIN' -m pip install -q --upgrade pip
   pip_retry -q torch torchvision --index-url '$TORCH_INDEX'
   pip_retry -q -r requirements.txt
 "
 
 # Verify torch sees the right device
-su - "$RUN_AS" -c "
-  export PYENV_ROOT=\"$RUN_HOME/.pyenv\"
-  export PATH=\"\$PYENV_ROOT/bin:\$PATH\"
-  eval \"\$(pyenv init -)\" 2>/dev/null || true
-  python - << 'PYCHK'
+su - "$RUN_AS" -c "'$PY_BIN' - << 'PYCHK'
 import torch
 cuda = torch.cuda.is_available()
 print(f'[VitCam] torch {torch.__version__} | CUDA available: {cuda}')
