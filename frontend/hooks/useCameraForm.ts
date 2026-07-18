@@ -7,9 +7,17 @@ import { CameraService } from '@/services/camera.service'
 const STANDARD_CLASS_NAMES = Object.values(DETECTION_CLASSES)
 const CUSTOM_CLASS_NAMES = Object.values(CUSTOM_DETECTION_CLASSES)
 
+/** Models that use the custom class list and do NOT support Segmentation. */
+const RESTRICTED_MODELS = ['Custom', 'Edge']
+
+/** Returns true if the given modelsize is a restricted model (Custom or Edge). */
+function isRestrictedModel(modelsize: string): boolean {
+  return RESTRICTED_MODELS.includes(modelsize)
+}
+
 /** Returns the full class list for a given modelsize. */
 function getDefaultClasses(modelsize: string): string[] {
-  return modelsize === 'Custom' ? [...CUSTOM_CLASS_NAMES] : modelsize =='Edge' ? [...CUSTOM_CLASS_NAMES] : [...STANDARD_CLASS_NAMES ] 
+  return isRestrictedModel(modelsize) ? [...CUSTOM_CLASS_NAMES] : [...STANDARD_CLASS_NAMES]
 }
 
 export function useCameraForm(camera?: Camera | null, isEditing = false) {
@@ -60,8 +68,8 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
           newData.odclasses = getDefaultClasses(value)
         }
 
-        // Custom model does not support Segmentation — fall back to BoundingBox
-        if (field === 'modelsize' && value === 'Custom' && prev.detectiontype === 'Segmentation') {
+        // Edge/Custom models do not support Segmentation — fall back to BoundingBox
+        if (field === 'modelsize' && isRestrictedModel(value) && prev.detectiontype === 'Segmentation') {
           newData.detectiontype = 'BoundingBox'
         }
 
@@ -126,8 +134,8 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
 
     if (!formData.detectiontype) {
       newErrors.detectiontype = 'Detection type is required'
-    } else if (formData.modelsize === 'Custom' && formData.detectiontype === 'Segmentation') {
-      newErrors.detectiontype = 'Segmentation is not supported with the Custom model'
+    } else if (isRestrictedModel(formData.modelsize) && formData.detectiontype === 'Segmentation') {
+      newErrors.detectiontype = `Segmentation is not supported with the ${formData.modelsize} model`
     }
 
     if (formData.is_detection) {
@@ -173,6 +181,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
     errors,
     submitting,
     isCustomModel: formData.modelsize === 'Custom',
+    isRestrictedModel: isRestrictedModel(formData.modelsize),
     updateField,
     handleSubmit,
     resetForm,

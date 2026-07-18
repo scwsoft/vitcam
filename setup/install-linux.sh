@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  VitCam -- Ubuntu / Debian Installer
-#  Run as ROOT: sudo bash setup/install-linux.sh
-#  Tested on Ubuntu 22.04 / 24.04 LTS and Debian 12 (Bookworm)
+#  Run as ROOT: sudo bash setup/install-linux.sh [--gpu|--cpu]
+#
+#  Supported:
+#    Ubuntu 22.04 / 24.04 LTS
+#    Debian 12 (Bookworm) / Debian 13 (Trixie)
+#
+#  Inference modes:
+#    (default)  Auto-detect NVIDIA GPU -> CUDA if found, else CPU
+#    --gpu      Force NVIDIA CUDA install even if detection fails
+#    --cpu      Force CPU-only mode (skips all NVIDIA/CUDA steps,
+#               installs the lightweight CPU-only PyTorch wheels)
 # =============================================================================
 set -euo pipefail
 
@@ -15,6 +24,9 @@ SERVER_PORT=8765
 FRONTEND_PORT=3000
 SUPABASE_PORT=8000
 PYTHON_VERSION="3.10.11"
+CUDA_TOOLKIT_PKG="cuda-toolkit-12-8"
+TORCH_CUDA_INDEX="https://download.pytorch.org/whl/cu128"
+TORCH_CPU_INDEX="https://download.pytorch.org/whl/cpu"
 
 # Resolve the user who will own VitCam files and run the services
 # SUDO_USER is set when running via sudo; fall back to whoami
@@ -34,6 +46,21 @@ header()  { echo -e "\n${BOLD}${CYAN}== $* ==${RESET}\n"; }
 # Run a command as the non-root user
 as_user() { su - "$RUN_AS" -c "$*"; }
 
+# -- CLI flags ----------------------------------------------------------------
+FORCE_MODE="auto"   # auto | gpu | cpu
+for arg in "$@"; do
+  case "$arg" in
+    --gpu) FORCE_MODE="gpu" ;;
+    --cpu) FORCE_MODE="cpu" ;;
+    -h|--help)
+      echo "Usage: sudo bash setup/install-linux.sh [--gpu|--cpu]"
+      echo "  --gpu   Force NVIDIA CUDA installation"
+      echo "  --cpu   Force CPU-only mode (no NVIDIA packages, CPU torch wheels)"
+      exit 0 ;;
+    *) warn "Unknown flag: $arg (ignored)" ;;
+  esac
+done
+
 # -- Preflight ----------------------------------------------------------------
 header "VitCam Installer -- Ubuntu / Debian"
 
@@ -41,10 +68,45 @@ if [[ $EUID -ne 0 ]]; then
   error "Please run as root: sudo bash setup/install-linux.sh"
 fi
 
-info "Installing as root, services will run as: $RUN_AS"
-info "VitCam directory: $VITCAM_DIR"
+# OS detection -- done once, used everywhere
+[[ -f /etc/os-release ]] || error "Cannot detect OS: /etc/os-release not found."
+OS_ID=$(. /etc/os-release && echo "${ID:-}")
+OS_ID_LIKE=$(. /etc/os-release && echo "${ID_LIKE:-}")
+OS_VERSION_ID=$(. /etc/os-release && echo "${VERSION_ID:-}")
+OS_PRETTY=$(. /etc/os-release && echo "${PRETTY_NAME:-unknown}")
+OS_CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-}")
 
-# -- Step 1 / 9: System dependencies ------------------------------------------
+case "$OS_ID" in
+  ubuntu)
+    OS_FAMILY="ubuntu"
+    case "$OS_VERSION_ID" in
+      22.04|24.04) : ;;
+      *) warn "Untested Ubuntu version: $OS_VERSION_ID -- proceeding anyway." ;;
+    esac
+    ;;
+  debian)
+    OS_FAMILY="debian"
+    case "$OS_VERSION_ID" in
+      12|13) : ;;
+      *) warn "Untested Debian version: $OS_VERSION_ID -- proceeding anyway." ;;
+    esac
+    ;;
+  *)
+    if [[ "$OS_ID_LIKE" == *debian* ]]; then
+      OS_FAMILY="debian"
+      warn "Debian-derivative detected ($OS_ID) -- treating as Debian."
+    else
+      error "Unsupported OS: $OS_PRETTY. This installer supports Ubuntu 22.04/24.04 and Debian 12/13."
+    fi
+    ;;
+esac
+
+info "Detected OS:       $OS_PRETTY"
+info "Inference mode:    $FORCE_MODE (auto = detect GPU)"
+info "Installing as root, services will run as: $RUN_AS"
+info "VitCam directory:  $VITCAM_DIR"
+
+# -- Step 1 / 10: System dependencies ------------------------------------------
 header "Step 1 / 10 -- System dependencies"
 
 apt-get update -qq
@@ -53,61 +115,124 @@ apt-get install -y -qq \
   git curl wget build-essential libssl-dev zlib1g-dev libbz2-dev \
   libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
   xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev \
-  ffmpeg libgl1 libglib2.0-0 nginx
+  ffmpeg libgl1 libglib2.0-0 nginx pciutils lshw ca-certificates gnupg
 
 success "System dependencies installed."
 
-# -- Step 2 / 9: NVIDIA CUDA (auto-detected) ----------------------------------
-header "Step 2 / 10 -- NVIDIA CUDA"
+# -- Step 2 / 10: NVIDIA CUDA / CPU mode ---------------------------------------
+header "Step 2 / 10 -- Inference backend (NVIDIA CUDA or CPU)"
 
 CUDA_INSTALLED=false
 GPU_FOUND=false
+USE_GPU=false
 
-if lspci 2>/dev/null | grep -qi "nvidia" || lshw -C display 2>/dev/null | grep -qi "nvidia"; then
+detect_gpu() {
+  if lspci 2>/dev/null | grep -qi "nvidia"; then return 0; fi
+  if lshw -C display 2>/dev/null | grep -qi "nvidia"; then return 0; fi
+  if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then return 0; fi
+  return 1
+}
+
+if [[ "$FORCE_MODE" == "cpu" ]]; then
+  info "CPU mode forced (--cpu) -- skipping all NVIDIA/CUDA installation."
+elif [[ "$FORCE_MODE" == "gpu" ]]; then
+  USE_GPU=true
   GPU_FOUND=true
+  info "GPU mode forced (--gpu)."
+else
+  if detect_gpu; then
+    GPU_FOUND=true
+    USE_GPU=true
+    info "NVIDIA GPU detected."
+  else
+    warn "No NVIDIA GPU detected -- VitCam will run in CPU inference mode."
+    warn "If this machine DOES have an NVIDIA card, re-run with: --gpu"
+  fi
 fi
 
-if $GPU_FOUND; then
-  info "NVIDIA GPU detected."
-  if command -v nvcc >/dev/null 2>&1; then
-    CUDA_INSTALLED=true
-    success "CUDA already installed: $(nvcc --version | grep release | awk '{print $5}' | tr -d ',')"
-  else
-    info "Installing NVIDIA CUDA drivers and toolkit..."
-    OS_ID=$(. /etc/os-release && echo "$ID")
-    OS_VERSION=$(. /etc/os-release && echo "$VERSION_ID" | tr -d '.')
-    if [[ "$OS_ID" == "ubuntu" ]]; then
-      wget -q "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${OS_VERSION}/x86_64/cuda-keyring_1.1-1_all.deb" \
-        -O /tmp/cuda-keyring.deb 2>/dev/null || \
-      wget -q "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb" \
-        -O /tmp/cuda-keyring.deb
+install_cuda_ubuntu() {
+  # Map to the nearest NVIDIA repo (ubuntu2204 / ubuntu2404)
+  local repo_ver
+  case "$OS_VERSION_ID" in
+    22.*) repo_ver="ubuntu2204" ;;
+    24.*|*) repo_ver="ubuntu2404" ;;
+  esac
+  info "Adding NVIDIA CUDA repository ($repo_ver)..."
+  wget -q "https://developer.download.nvidia.com/compute/cuda/repos/${repo_ver}/x86_64/cuda-keyring_1.1-1_all.deb" \
+    -O /tmp/cuda-keyring.deb
+  dpkg -i /tmp/cuda-keyring.deb
+  apt-get update -qq
+  # DKMS driver build needs kernel headers
+  apt-get install -y -qq "linux-headers-$(uname -r)" 2>/dev/null || \
+    apt-get install -y -qq linux-headers-generic
+  apt-get install -y -qq cuda-drivers "$CUDA_TOOLKIT_PKG"
+}
+
+install_cuda_debian() {
+  # NVIDIA publishes a debian12 repo; use it for both driver + toolkit.
+  # Debian 13 has no dedicated NVIDIA repo yet -> fall back to Debian's own
+  # nvidia-driver from non-free, which is CUDA-capable at runtime.
+  info "Enabling contrib / non-free / non-free-firmware components..."
+  if command -v apt-add-repository >/dev/null 2>&1; then
+    apt-add-repository -y contrib non-free non-free-firmware 2>/dev/null || true
+  fi
+  # Fallback: rewrite sources directly (covers both .list and deb822 .sources)
+  if [[ -f /etc/apt/sources.list ]]; then
+    sed -i 's/^\(deb.*main\)\( contrib\)\?\( non-free\)\?\( non-free-firmware\)\?$/\1 contrib non-free non-free-firmware/' \
+      /etc/apt/sources.list
+  fi
+  if [[ -f /etc/apt/sources.list.d/debian.sources ]]; then
+    sed -i 's/^Components: main.*/Components: main contrib non-free non-free-firmware/' \
+      /etc/apt/sources.list.d/debian.sources
+  fi
+  apt-get update -qq
+  apt-get install -y -qq "linux-headers-$(uname -r)" 2>/dev/null || \
+    apt-get install -y -qq linux-headers-amd64
+
+  if [[ "$OS_VERSION_ID" == "12" ]]; then
+    info "Adding NVIDIA CUDA repository (debian12)..."
+    if wget -q "https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb" \
+        -O /tmp/cuda-keyring.deb; then
       dpkg -i /tmp/cuda-keyring.deb
       apt-get update -qq
-      apt-get install -y -qq cuda-drivers cuda-toolkit-12-8
-      CUDA_INSTALLED=true
-      success "NVIDIA CUDA drivers and toolkit installed."
-      warn "A reboot is recommended after install to fully activate the NVIDIA driver."
-    elif [[ "$OS_ID" == "debian" ]]; then
-      apt-get install -y -qq nvidia-driver firmware-misc-nonfree
-      CUDA_INSTALLED=true
-      success "NVIDIA drivers installed (Debian)."
-    else
-      warn "Unsupported OS for auto CUDA: $OS_ID -- install CUDA manually from https://developer.nvidia.com/cuda-downloads"
+      apt-get install -y -qq cuda-drivers "$CUDA_TOOLKIT_PKG"
+      return 0
     fi
+    warn "NVIDIA repo unreachable -- falling back to Debian's nvidia-driver."
   fi
-  if $CUDA_INSTALLED && command -v nvidia-smi >/dev/null 2>&1; then
+  # Debian 13, or Debian 12 fallback
+  apt-get install -y -qq nvidia-driver firmware-misc-nonfree
+  warn "Installed Debian's NVIDIA driver (no full CUDA toolkit)."
+  warn "PyTorch CUDA wheels bundle their own CUDA runtime, so inference will still use the GPU."
+}
+
+if $USE_GPU; then
+  if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+    CUDA_INSTALLED=true
+    success "NVIDIA driver already working: $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)"
+  else
+    info "Installing NVIDIA driver + CUDA..."
+    if [[ "$OS_FAMILY" == "ubuntu" ]]; then
+      install_cuda_ubuntu
+    else
+      install_cuda_debian
+    fi
+    CUDA_INSTALLED=true
+    success "NVIDIA driver / CUDA installation complete."
+    warn "A reboot is recommended after install to fully activate the NVIDIA driver."
+  fi
+
+  if command -v nvidia-smi >/dev/null 2>&1; then
     nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null | \
       while IFS=',' read -r name driver mem; do
         echo -e "  ${GREEN}GPU:${RESET} $name | Driver: $driver | VRAM: $mem"
       done
   fi
-else
-  warn "No NVIDIA GPU detected -- VitCam will run in CPU inference mode."
 fi
 
-success "GPU/CPU setup complete."
+success "Inference backend setup complete ($($USE_GPU && echo 'GPU/CUDA' || echo 'CPU'))."
 
-# -- Step 3 / 9: Docker -------------------------------------------------------
+# -- Step 3 / 10: Docker -------------------------------------------------------
 header "Step 3 / 10 -- Docker Engine"
 
 # Detect if running inside a Docker container
@@ -151,15 +276,6 @@ if $IN_CONTAINER; then
   fi
   success "Docker connected via host socket."
 else
-  # Native host: install, configure and start daemon
-  if ! command -v docker >/dev/null; then
-    info "Installing Docker Engine..."
-    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-    sh /tmp/get-docker.sh
-  else
-    success "Docker already installed: $(docker --version)"
-  fi
-
   # Add user to docker group and activate immediately
   usermod -aG docker "$RUN_AS" 2>/dev/null || true
   usermod -aG docker root 2>/dev/null || true
@@ -186,7 +302,7 @@ fi
 
 success "Docker $(docker --version) ready."
 
-# -- Step 4 / 9: Node.js ------------------------------------------------------
+# -- Step 4 / 10: Node.js ------------------------------------------------------
 header "Step 4 / 10 -- Node.js"
 
 if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 18 ]]; then
@@ -196,7 +312,7 @@ if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 1
 fi
 success "Node.js $(node -v) ready."
 
-# -- Step 5 / 9: Clone VitCam ------------------------------------------------
+# -- Step 5 / 10: Clone VitCam ------------------------------------------------
 header "Step 5 / 10 -- Clone VitCam"
 
 if [[ -d "$VITCAM_DIR/.git" ]]; then
@@ -207,7 +323,7 @@ else
 fi
 success "Repository ready at $VITCAM_DIR."
 
-# -- Step 6 / 9: Supabase via Docker ------------------------------------------
+# -- Step 6 / 10: Supabase via Docker ------------------------------------------
 header "Step 6 / 10 -- Supabase (Docker)"
 
 SUPABASE_DOCKER_DIR="$VITCAM_DIR/supabase/docker"
@@ -359,13 +475,55 @@ success "Python $PYTHON_VERSION ready."
 # -- Step 9 / 10: Backend dependencies -----------------------------------------
 header "Step 9 / 10 -- Backend dependencies"
 
+# Install PyTorch FIRST with the wheel index matching the inference mode.
+# CPU wheels are ~10x smaller than the default CUDA wheels; CUDA wheels bundle
+# their own CUDA runtime so they work even without the full toolkit installed.
+if $USE_GPU; then
+  TORCH_INDEX="$TORCH_CUDA_INDEX"
+  info "Installing PyTorch (CUDA wheels: cu128)..."
+else
+  TORCH_INDEX="$TORCH_CPU_INDEX"
+  info "Installing PyTorch (CPU-only wheels)..."
+fi
+
 su - "$RUN_AS" -c "
   export PYENV_ROOT=\"$RUN_HOME/.pyenv\"
   export PATH=\"\$PYENV_ROOT/bin:\$PATH\"
   eval \"\$(pyenv init -)\" 2>/dev/null || true
   cd '$VITCAM_DIR/server'
-  pip install -q -r requirements.txt
+
+  # Retry pip on unstable connections
+  pip_retry() {
+    for attempt in 1 2 3; do
+      pip install --retries 5 --timeout 60 \"\$@\" && return 0
+      echo '[VitCam] pip failed (attempt '\$attempt'/3) -- retrying in 10s...'
+      sleep 10
+    done
+    return 1
+  }
+
+  pip_retry -q torch torchvision --index-url '$TORCH_INDEX'
+  pip_retry -q -r requirements.txt
 "
+
+# Verify torch sees the right device
+su - "$RUN_AS" -c "
+  export PYENV_ROOT=\"$RUN_HOME/.pyenv\"
+  export PATH=\"\$PYENV_ROOT/bin:\$PATH\"
+  eval \"\$(pyenv init -)\" 2>/dev/null || true
+  python - << 'PYCHK'
+import torch
+cuda = torch.cuda.is_available()
+print(f'[VitCam] torch {torch.__version__} | CUDA available: {cuda}')
+if cuda:
+    print(f'[VitCam] Device: {torch.cuda.get_device_name(0)}')
+PYCHK
+" || true
+
+if $USE_GPU; then
+  warn "If CUDA shows as unavailable above, reboot to load the NVIDIA driver, then verify with: nvidia-smi"
+fi
+
 success "Backend dependencies installed."
 
 # -- Step 10 / 10: Frontend + nginx + systemd -----------------------------------
@@ -453,6 +611,7 @@ ExecStart=$PYTHON_BIN main.py
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=$VITCAM_DIR/server/.env
+Environment=VITCAM_DETECTION_BACKEND=torch
 
 [Install]
 WantedBy=multi-user.target
@@ -470,9 +629,12 @@ echo -e "${GREEN}${BOLD}  VitCam installed successfully!${RESET}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════${RESET}"
 echo ""
 HOST_IP=$(hostname -I | awk '{print $1}')
-$GPU_FOUND && $CUDA_INSTALLED && \
-  echo -e "  Inference mode:  ${GREEN}GPU (CUDA)${RESET}" || \
+echo -e "  OS:              ${CYAN}$OS_PRETTY${RESET}"
+if $USE_GPU; then
+  echo -e "  Inference mode:  ${GREEN}GPU (NVIDIA CUDA)${RESET}"
+else
   echo -e "  Inference mode:  ${YELLOW}CPU only${RESET}"
+fi
 echo -e "  Frontend:        ${CYAN}http://${HOST_IP}${RESET}  (port 80 via nginx)"
 echo -e "  Frontend direct: ${CYAN}http://localhost:${FRONTEND_PORT}${RESET}"
 echo -e "  Backend API:     ${CYAN}http://localhost:${SERVER_PORT}${RESET}"
@@ -487,4 +649,9 @@ echo -e "    ${BOLD}systemctl restart vitcam-server${RESET}"
 echo ""
 echo -e "  Supabase:  ${BOLD}cd $VITCAM_DIR/supabase/docker && docker compose ps${RESET}"
 echo -e "  nginx:     ${BOLD}systemctl status nginx${RESET} | ${BOLD}nginx -t${RESET}"
+if $USE_GPU; then
+  echo ""
+  echo -e "  ${YELLOW}Reminder: reboot if this was a fresh NVIDIA driver install, then run:${RESET}"
+  echo -e "    ${BOLD}nvidia-smi${RESET}"
+fi
 echo ""
