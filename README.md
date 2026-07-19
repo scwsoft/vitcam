@@ -807,9 +807,9 @@ You can mix modes across cameras — for example, run AI detection on entrance c
 
 ## Screenshots
 
-<img src="./docs/images/ViTCam-Live.gif" />
+<img src="./docs/images/VitCam-Live.gif" />
 
-<img src="./docs/images/ViTCam-Live2.gif" />
+<img src="./docs/images/VitCam-Live2.gif" />
 
 ---
 
@@ -967,5 +967,3 @@ ViTCam is built on top of excellent open-source projects:
 - [Next.js](https://nextjs.org) — React framework
 
 ---
-
-*Made with ❤️ in the Philippines*
