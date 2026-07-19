@@ -34,7 +34,6 @@ ViTCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Setting Up the Camera Server](#setting-up-the-camera-server)
   - [Adding a Camera](#adding-a-camera)
 - [AI Models](#ai-models)
-- [Contributing](#contributing)
 - [License](#license)
 
 ---
@@ -888,44 +887,10 @@ We are building a marketplace of fine-tuned, purpose-built detection models avai
 - **Crowd analytics** — people counting and density monitoring
 - **Custom verticals** — retail, agriculture, industrial, and more
 
-Models will be available to purchase and install directly from the ViTCam UI with a single click. Visit [vitcam.io](https://vitcam.io) to register your interest.
+Models will be available to purchase and install directly from the ViTCam UI with a single click. Visit [vitcam.net](https://vitcam.net) to register your interest.
 
 ---
 
-## Contributing
-
-Contributions are welcome! ViTCam is maintained by a solo developer, so please read the contributing guidelines before submitting.
-
-### How to Contribute
-
-1. **Report bugs** — Open an issue with steps to reproduce, your OS/GPU, and relevant logs
-2. **Suggest features** — Open a discussion before submitting a large PR
-3. **Submit fixes** — Small, focused PRs are much easier to review than large ones
-
-### Development Setup
-
-```bash
-# Fork and clone
-git clone https://github.com/scwsoft/vitcam.git
-cd vitcam
-
-# Backend (Python)
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-
-# Frontend (Next.js)
-cd ../frontend
-npm install
-npm run dev
-```
-
-### Note on Pull Requests
-
-Due to the complexity of coordinating changes across the AI pipeline, streaming server, and frontend, pull requests are reviewed carefully and may take time. Please open an issue first for any significant feature work — this avoids duplicate effort and helps ensure the change aligns with the project roadmap.
-
----
 
 ## License
 
@@ -961,9 +926,7 @@ GNU Affero General Public License for more details.
 ViTCam is built on top of excellent open-source projects:
 
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
-- [](https://github.com/nwojke/deep_sort) — Multi-object tracking
-- [aiortc](https://github.com/aiortc/aiortc) — WebRTC for Python
-- [Supabase](https://supabase.com) — Open-source Firebase alternative
-- [Next.js](https://nextjs.org) — React framework
+- [Supabase](https://supabase.com) — Open-source database and storage platform
+- [Ultralytics](https://ultralytics.com) — AI vision models and inference tools
 
 ---
