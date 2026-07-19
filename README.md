@@ -877,17 +877,17 @@ The **Analytics** dashboard gives you deep insight into activity across all your
 
 ViTCam's AI detection works out of the box for common surveillance scenarios — people, vehicles, drones, and safety equipment. Detection models can be assigned per camera directly from the settings UI.
 
-### AI Model Marketplace *(coming soon)*
+### Model Add-Ons *(coming soon)*
 
-We are building a marketplace of fine-tuned, purpose-built detection models available as add-ons — covering specialist use cases such as:
+As the ViTCam community grows, we want to make it easier for users to extend detection capabilities beyond the defaults. We are working on a set of purpose-built model add-ons contributed by and built for the community — covering real-world use cases that users have asked for:
 
-- **Drone / UAV detection** — airspace monitoring and restricted zone alerts
-- **PPE & safety compliance** — helmet, vest, and protective equipment detection
-- **Vehicle classification** — car, truck, motorcycle, bus, and licence plate recognition
-- **Crowd analytics** — people counting and density monitoring
-- **Custom verticals** — retail, agriculture, industrial, and more
+- Drone and UAV detection
+- PPE and safety compliance monitoring
+- Vehicle classification and counting
+- Crowd and occupancy analytics
+- Industry-specific scenarios
 
-Models will be available to purchase and install directly from the ViTCam UI with a single click. Visit [vitcam.net](https://vitcam.net) to register your interest.
+The goal is to give every ViTCam user access to models that are ready to use without needing to train or configure anything. More details coming soon.
 
 ---
 
@@ -930,3 +930,4 @@ ViTCam is built on top of excellent open-source projects:
 - [Ultralytics](https://ultralytics.com) — AI vision models and inference tools
 
 ---
+
