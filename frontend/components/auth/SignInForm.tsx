@@ -354,9 +354,6 @@ export default function SignInForm() {
                 <label htmlFor="password" className="block text-[13px] font-medium text-slate-300">
                   Password
                 </label>
-                <Link href="/reset-password" className="text-xs text-sky-400 transition hover:text-sky-300">
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
                 <input
@@ -460,13 +457,6 @@ export default function SignInForm() {
               </div>
             </div>
           )}
-
-          <p className="vc-rise mt-9 text-center text-sm text-slate-500" style={{ animationDelay: "300ms" }}>
-            New deployment?{" "}
-            <Link href="/signup" className="font-medium text-amber-400 transition hover:text-amber-300">
-              Create the admin account
-            </Link>
-          </p>
         </div>
 
         {/* Mobile footer */}
