@@ -141,9 +141,9 @@ ViTCam pulls each stream and processes it locally. For on-premises cameras, no i
                        │ WebRTC / REST / Realtime
 ┌──────────────────────▼──────────────────────────────────┐
 │                  Camera Server                          │
-│   Live Streaming Engine  │  REST API                   │
-│   AI Detection           │  Object Tracking            │
-│   Recording Engine       │                             │
+│   Live Streaming Engine  │  REST API                    │
+│   AI Detection           │  Object Tracking             │
+│   Recording Engine       │                              │
 └──────────────────────┬──────────────────────────────────┘
                        │
              ┌─────────┴─────────┐
