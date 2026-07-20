@@ -24,16 +24,6 @@ for the specific requirements.
 
 ---
 
-## Third-Party Components
-
-This project includes third-party components under their own
-licenses (e.g., BSD 3-Clause). These do not change the license of
-VitCam as a whole, which remains AGPL-3.0-or-later as stated above.
-See `THIRD_PARTY_LICENSES.md` for the full list of components,
-their licenses, and copyright notices.
-
----
-
 ## Full License Text
 
 ```
