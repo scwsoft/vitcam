@@ -378,7 +378,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 if self.model_size == "Edge" :
                   class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
                 elif self.model_size == "Custom" :
-                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
+                  class_name =  CUSTOM_CLASS_NAMES[class_id]
                 else :
                   class_name =  COCO_CLASS_NAMES[class_id]
 
@@ -822,7 +822,7 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 if self.model_size == "Edge" :
                   class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
                 elif self.model_size == "Custom" :
-                   class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
+                   class_name =  CUSTOM_CLASS_NAMES[class_id]
                 else :
                    class_name =  COCO_CLASS_NAMES[class_id]
  
