@@ -134,9 +134,7 @@ export function useCameraForm(camera?: Camera | null, isEditing = false) {
 
     if (!formData.detectiontype) {
       newErrors.detectiontype = 'Detection type is required'
-    } else if (isRestrictedModel(formData.modelsize) && formData.detectiontype === 'Segmentation') {
-      newErrors.detectiontype = `Segmentation is not supported with the ${formData.modelsize} model`
-    }
+    } 
 
     if (formData.is_detection) {
       if (formData.odthreshold < 1 || formData.odthreshold > 100) {

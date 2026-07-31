@@ -156,6 +156,17 @@ class CameraPredictorWithAnalytics(CameraPredictor):
     NMS_IOU_THRESHOLD: float = 0.35   # tighter than original 0.50
     MIN_CONFIDENCE:    float = 0.50   # raised from original 0.45
 
+    # ── ONNX (Edge backend) inference config ──────────────────────────────
+    # Defaults assume an RF-DETR-style ONNX export. Adjust to match YOUR
+    # export if it differs (see _predict_onnx / _parse_onnx_outputs).
+    ONNX_INPUT_SIZE:      int = 560          # fallback H/W if the session has
+                                             # no static input shape
+    ONNX_TOP_K:          int = 300          # DETR-style top-k query selection
+    ONNX_CLASS_ID_OFFSET: int = 0           # added to model class idx to line
+                                             # up with CUSTOM_CLASS_NAMES keys
+    ONNX_MEAN = (0.485, 0.456, 0.406)        # ImageNet normalisation (RF-DETR)
+    ONNX_STD  = (0.229, 0.224, 0.225)
+
     # Separator between label fields. Must be ASCII — supervision's
     # LabelAnnotator draws with cv2.putText, which can't render "•"/"·"/etc.
     # (a non-ASCII char shows up as "???"). For a real bullet, switch the
@@ -335,17 +346,18 @@ class CameraPredictorWithAnalytics(CameraPredictor):
 
         try:
             # ── 1. Model inference ────────────────────────────────────────────
-            converted_image = Image.fromarray(frame)
-
-            if self.camera_config.modelsize =="Edge":
-                
-             result = self.model(converted_image)[0]
-             detections = sv.Detections.from_ultralytics(result)
-          
-            else : 
-             detections = self.model.predict(
-             converted_image, threshold=self.confidence_threshold
-            )
+            #   Edge  → ONNX Runtime session (self.model is an
+            #           onnxruntime.InferenceSession supplied by the factory).
+            #   other → RF-DETR object exposing .predict().
+            if self.model_size == "Edge":
+                detections = self._predict_onnx(
+                    frame, threshold=self.confidence_threshold
+                )
+            else:
+                converted_image = Image.fromarray(frame)
+                detections = self.model.predict(
+                    converted_image, threshold=self.confidence_threshold
+                )
 
             # ── 2. Class filter + confidence floor ────────────────────────────
             if self.detection_classes:
@@ -376,9 +388,9 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                 # class_name =  COCO_CLASS_NAMES[class_id] if self.model_size != "Custom" else CUSTOM_CLASS_NAMES[str(class_id)]
                 
                 if self.model_size == "Edge" :
-                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
-                elif self.model_size == "Custom" :
                   class_name =  CUSTOM_CLASS_NAMES[class_id]
+                elif self.model_size == "Custom" :
+                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
                 else :
                   class_name =  COCO_CLASS_NAMES[class_id]
 
@@ -405,6 +417,191 @@ class CameraPredictorWithAnalytics(CameraPredictor):
             )
             logger.error(f"Traceback: {traceback.format_exc()}")
             return frame
+
+    # ── Internal: ONNX inference (Edge backend) ───────────────────────────────
+
+    def _onnx_input_size(self) -> tuple:
+        """
+        Return the (H, W) the ONNX model expects.
+
+        Read from the session's static input shape when available; otherwise
+        fall back to ONNX_INPUT_SIZE. RF-DETR exports usually carry a fixed
+        [1, 3, H, W] input, so this normally resolves automatically.
+        """
+        try:
+            shape = self.model.get_inputs()[0].shape  # e.g. [1, 3, 560, 560]
+            h, w = shape[2], shape[3]
+            if isinstance(h, int) and isinstance(w, int) and h > 0 and w > 0:
+                return h, w
+        except Exception:
+            pass
+        return self.ONNX_INPUT_SIZE, self.ONNX_INPUT_SIZE
+
+    def _predict_onnx(self, frame: np.ndarray, threshold: float) -> "sv.Detections":
+        """
+        Run detection with an ONNX Runtime session (Edge backend).
+
+        `self.model` must be an ``onnxruntime.InferenceSession`` provided by the
+        factory for Edge cameras — mirroring how non-Edge cameras receive an
+        RF-DETR object. No YOLO / Ultralytics involved.
+
+        `threshold` is the user-defined confidence (camera_config.odthreshold),
+        passed in explicitly so the Edge path applies it the same way the
+        non-Edge path passes it to RF-DETR's .predict().
+
+        Assumed RF-DETR-style export (from forward_export)
+        --------------------------------------------------
+            input : [1, 3, H, W]  float32, RGB, ImageNet-normalised
+            output: boxes  [1, Q, 4]       (cx, cy, w, h), normalised 0..1
+                    logits [1, Q, C]       raw (pre-sigmoid) class logits
+                    masks  [1, Q, Hm, Wm]  raw mask logits (segmentation only)
+
+        `frame` is the clean RGB frame (same array the RF-DETR path wraps with
+        Image.fromarray). If any of the above doesn't match your export, adjust
+        the class constants above and/or _parse_onnx_outputs below.
+        """
+        in_h, in_w     = self._onnx_input_size()
+        orig_h, orig_w = frame.shape[:2]
+
+        # ── Pre-process ───────────────────────────────────────────────────
+        img  = cv2.resize(frame, (in_w, in_h), interpolation=cv2.INTER_LINEAR)
+        img  = img.astype(np.float32) / 255.0
+        mean = np.array(self.ONNX_MEAN, dtype=np.float32)
+        std  = np.array(self.ONNX_STD,  dtype=np.float32)
+        img  = (img - mean) / std
+        img  = np.transpose(img, (2, 0, 1))[None, ...]        # HWC → NCHW
+        img  = np.ascontiguousarray(img, dtype=np.float32)
+
+        # ── Inference ─────────────────────────────────────────────────────
+        input_name = self.model.get_inputs()[0].name
+        outputs    = self.model.run(None, {input_name: img})
+
+        return self._parse_onnx_outputs(outputs, orig_w, orig_h, threshold)
+
+    def _parse_onnx_outputs(
+        self,
+        outputs: list,
+        orig_w: int,
+        orig_h: int,
+        threshold: float,
+    ) -> "sv.Detections":
+        """
+        Turn raw RF-DETR ONNX outputs into an sv.Detections in original-image
+        pixel coordinates.
+
+        Handles both export shapes (rfdetr forward_export):
+          • detection    → 2 outputs: boxes [1,Q,4] + logits [1,Q,C]
+          • segmentation → 3 outputs: boxes + logits + masks [1,Q,Hm,Wm]
+
+        Outputs are identified by shape (last dim 4 == boxes, other 3-D ==
+        logits, 4-D == mask logits), so ordering doesn't matter. Scores come
+        from a sigmoid over the class logits, followed by DETR-style top-k
+        selection across every (query × class) pair. Detections below
+        `threshold` (the user-defined confidence) are dropped here — the same
+        confidence RF-DETR's .predict() applies on the non-Edge path. For seg
+        models the mask of each selected query is upsampled to the frame size
+        and thresholded, exactly as rfdetr's PostProcess._postprocess_masks does.
+        """
+        boxes_raw, logits_raw, masks_raw = None, None, None
+        for arr in outputs:
+            a = np.asarray(arr)
+            if a.ndim == 3 and a.shape[-1] == 4:
+                boxes_raw = a[0]
+            elif a.ndim == 3:
+                logits_raw = a[0]
+            elif a.ndim == 4:
+                masks_raw = a[0]                      # [Q, Hm, Wm] mask logits
+
+        if boxes_raw is None or logits_raw is None:
+            logger.warning(
+                f"[{self.camera_config.name}] Unexpected ONNX output shapes "
+                f"{[np.asarray(o).shape for o in outputs]}; expected a "
+                "[1,Q,4] boxes tensor and a [1,Q,C] logits tensor."
+            )
+            return sv.Detections.empty()
+
+        if self.camera_config.detectiontype == "Segmentation" and masks_raw is None:
+            logger.warning(
+                f"[{self.camera_config.name}] Segmentation camera but the ONNX "
+                "model returned no 4-D mask tensor ([1,Q,Hm,Wm]). Masks will be "
+                "empty — check that the *segmentation* model was exported/loaded."
+            )
+
+        # sigmoid → per-(query,class) probabilities
+        scores    = 1.0 / (1.0 + np.exp(-logits_raw))          # [Q, C]
+        n_classes = scores.shape[1]
+        flat      = scores.reshape(-1)
+
+        k       = min(self.ONNX_TOP_K, flat.shape[0])
+        top_idx = np.argpartition(-flat, k - 1)[:k]
+        top_scr = flat[top_idx]
+
+        query_idx = top_idx // n_classes                       # row in boxes/masks
+        class_id  = (top_idx % n_classes) + self.ONNX_CLASS_ID_OFFSET
+
+        # Apply the user-defined confidence threshold passed in from predict_frame.
+        keep = top_scr >= threshold
+        query_idx, class_id, top_scr = query_idx[keep], class_id[keep], top_scr[keep]
+        if query_idx.size == 0:
+            return sv.Detections.empty()
+
+        # cxcywh (normalised) → xyxy (original-image pixels)
+        cxcywh = boxes_raw[query_idx]
+        xyxy   = np.empty_like(cxcywh)
+        xyxy[:, 0] = (cxcywh[:, 0] - cxcywh[:, 2] / 2.0) * orig_w
+        xyxy[:, 1] = (cxcywh[:, 1] - cxcywh[:, 3] / 2.0) * orig_h
+        xyxy[:, 2] = (cxcywh[:, 0] + cxcywh[:, 2] / 2.0) * orig_w
+        xyxy[:, 3] = (cxcywh[:, 1] + cxcywh[:, 3] / 2.0) * orig_h
+
+        det_kwargs = dict(
+            xyxy=xyxy.astype(np.float32),
+            confidence=top_scr.astype(np.float32),
+            class_id=class_id.astype(int),
+        )
+
+        # Segmentation: attach boolean full-frame masks for the same queries.
+        if masks_raw is not None:
+            det_kwargs["mask"] = self._build_onnx_masks(
+                masks_raw, query_idx, orig_w, orig_h
+            )
+
+        return sv.Detections(**det_kwargs)
+
+    def _build_onnx_masks(
+        self,
+        masks_raw: np.ndarray,
+        query_idx: np.ndarray,
+        orig_w: int,
+        orig_h: int,
+    ) -> np.ndarray:
+        """
+        Convert RF-DETR seg mask logits into boolean full-frame masks.
+
+        Args
+        ----
+        masks_raw : [Q, Hm, Wm] raw mask logits (one per query); Hm/Wm are the
+                    seg head's downsampled resolution.
+        query_idx : [K] query rows of the selected detections (aligned with the
+                    boxes/scores already gathered above).
+
+        Mirrors rfdetr PostProcess._postprocess_masks: gather the selected
+        queries' mask logits, bilinearly upsample each to the original frame
+        size, and threshold logits > 0 (equivalent to sigmoid > 0.5). Only the
+        K kept masks are resized, so cost stays low regardless of ONNX_TOP_K.
+
+        Returns a bool array [K, orig_h, orig_w] suitable for
+        sv.Detections(mask=...), which MaskAnnotator renders.
+        """
+        selected = masks_raw[query_idx]                        # [K, Hm, Wm]
+        out = np.zeros((selected.shape[0], orig_h, orig_w), dtype=bool)
+        for i in range(selected.shape[0]):
+            upsampled = cv2.resize(
+                selected[i].astype(np.float32),
+                (orig_w, orig_h),                              # cv2 dsize = (W, H)
+                interpolation=cv2.INTER_LINEAR,
+            )
+            out[i] = upsampled > 0.0
+        return out
 
     # ── Internal: tracking ────────────────────────────────────────────────────
 
@@ -820,9 +1017,9 @@ class CameraPredictorWithAnalytics(CameraPredictor):
                     continue
 
                 if self.model_size == "Edge" :
-                  class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
+                  class_name =  CUSTOM_CLASS_NAMES[class_id]
                 elif self.model_size == "Custom" :
-                   class_name =  CUSTOM_CLASS_NAMES[class_id]
+                   class_name =  CUSTOM_CLASS_NAMES[str(class_id)]
                 else :
                    class_name =  COCO_CLASS_NAMES[class_id]
  

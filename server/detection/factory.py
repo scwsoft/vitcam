@@ -11,7 +11,15 @@ from detection.predictor import CameraPredictor, CameraPredictorWithAnalytics
 from rfdetr import RFDETRSmall, RFDETRMedium, RFDETRLarge, RFDETRBase, RFDETRNano, RFDETRSegMedium, RFDETRSegSmall, RFDETRSegLarge,RFDETRSegNano
 from config.settings import settings
 from supabase import create_client
-from ultralytics import YOLO
+
+# onnxruntime powers the Edge backend (self-hosted ONNX models, e.g. on
+# Raspberry Pi). Imported defensively so non-Edge deployments don't hard-require
+# it; _build_onnx_session raises a clear error if an Edge camera needs it and
+# it's missing.
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
 
 
 logger = logging.getLogger(__name__)
@@ -92,9 +100,12 @@ class CameraPredictorFactory:
                           pretrained=True)
                 model.optimize_for_inference(compile=False) 
             
-            elif  camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':  
-                model = YOLO(f"{settings.MODEL_CHECKPOINT_PATH}")
-                device = None
+            elif camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':
+                # Edge backend: self-hosted ONNX model served via ONNX Runtime.
+                # `model` becomes an onnxruntime.InferenceSession — the object
+                # CameraPredictorWithAnalytics._predict_onnx drives (it calls
+                # get_inputs()/run() on it). No Ultralytics/YOLO involved.
+                model = cls._build_onnx_session(settings.MODEL_CHECKPOINT_PATH)
             
             
             if camera_config.modelsize == "Large" and camera_config.detectiontype == 'Segmentation':
@@ -112,6 +123,13 @@ class CameraPredictorFactory:
             elif camera_config.modelsize  == "Nano" and camera_config.detectiontype == 'Segmentation': 
                 model = RFDETRSegNano(device=device)
                 model.optimize_for_inference(compile=False) 
+
+            elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'Segmentation':
+                # Edge segmentation: ONNX seg model. rfdetr's forward_export emits
+                # dets + labels + masks, and CameraPredictorWithAnalytics._predict_onnx
+                # reads the mask output and renders it via MaskAnnotator. Same
+                # InferenceSession contract as the BoundingBox Edge branch.
+                model = cls._build_onnx_session(settings.SEG_MODEL_CHECKPOINT_PATH)
             
         
             logger.info(f"Loading model {camera_config.modelsize} on device: {device}")
@@ -133,7 +151,48 @@ class CameraPredictorFactory:
         except Exception as e:
             logger.error(f"Failed to initialize model: {e}")
             raise
-    
+
+    @staticmethod
+    def _build_onnx_session(model_path: str):
+        """
+        Build an ONNX Runtime session for an Edge camera.
+
+        Returns an ``onnxruntime.InferenceSession`` — the object that
+        ``CameraPredictorWithAnalytics._predict_onnx`` expects as
+        ``shared_model['model']`` (it reads get_inputs() and calls run() on it).
+
+        Execution providers are selected from what's actually available at
+        runtime, preferring hardware acceleration and always falling back to
+        CPU (the common case on a Raspberry Pi).
+        """
+        if ort is None:
+            raise ImportError(
+                "onnxruntime is required for Edge (ONNX) cameras but is not "
+                "installed. Install one of: `pip install onnxruntime` (CPU / "
+                "Raspberry Pi), `onnxruntime-gpu` (CUDA), or "
+                "`onnxruntime-openvino` (Intel)."
+            )
+
+        available = ort.get_available_providers()
+        preferred = [
+            "CUDAExecutionProvider",
+            "OpenVINOExecutionProvider",
+            "CPUExecutionProvider",
+        ]
+        providers = [p for p in preferred if p in available] or ["CPUExecutionProvider"]
+
+        sess_options = ort.SessionOptions()
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+        session = ort.InferenceSession(
+            model_path, sess_options=sess_options, providers=providers
+        )
+        logger.info(
+            f"Loaded ONNX Edge model '{model_path}' "
+            f"(active providers: {session.get_providers()})"
+        )
+        return session
+
     @classmethod
     async def create_predictor(cls, camera_config: CameraConfig, 
                               analytics_manager=None) -> CameraPredictor:
