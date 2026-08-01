@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  VitCam — Raspberry Pi Installer
-#  Tested on Raspberry Pi 4B / 5 — Ubuntu 26.04 LTS (64-bit)
+#  Tested on Raspberry Pi 4B / 5 — Raspberry Pi OS Debian Bookworm Legacy (64-bit)
 #  CPU inference only (no CUDA). Supabase via Docker.
 #  Run as a normal user with sudo access:
 #    chmod +x setup/install-raspberry-pi.sh
@@ -33,7 +33,7 @@ error()   { echo -e "${RED}[✗]${RESET} $*"; exit 1; }
 header()  { echo -e "\n${BOLD}${CYAN}══ $* ══${RESET}\n"; }
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
-header "VitCam Installer — Raspberry Pi (Ubuntu 26.04 LTS)"
+header "VitCam Installer — Raspberry Pi (Debian Bookworm Legacy 64-bit)"
 
 if [[ $EUID -eq 0 ]]; then
   error "Do not run as root. Run as a normal user with sudo access."
@@ -379,6 +379,7 @@ ExecStart=${PYTHON_BIN} main.py
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=${VITCAM_DIR}/server/.env
+Environment="SUPABASE_URL=http://localhost:8000"
 
 [Install]
 WantedBy=multi-user.target

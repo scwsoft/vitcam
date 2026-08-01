@@ -27,7 +27,7 @@ ViTCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Quick Start (Ubuntu)](#quick-start-ubuntu)
   - [Windows Setup (Conda)](#windows-setup-conda)
   - [macOS Setup](#macos-setup)
-  - [Raspberry Pi (Ubuntu 26.04 LTS)](#raspberry-pi-ubuntu-2604-lts)
+  - [Raspberry Pi (Debian Bookworm Legacy 64-bit)](#raspberry-pi-debian-bookworm-legacy-64-bit)
 - [Configuration](#configuration)
 - [Screenshots](#screenshots)
 - [Usage](#usage)
@@ -141,9 +141,9 @@ ViTCam pulls each stream and processes it locally. For on-premises cameras, no i
                        │ WebRTC / REST / Realtime
 ┌──────────────────────▼──────────────────────────────────┐
 │                  Camera Server                          │
-│   Live Streaming Engine  │  REST API                    │
-│   AI Detection           │  Object Tracking             │
-│   Recording Engine       │                              │
+│   Live Streaming Engine  │  REST API                   │
+│   AI Detection           │  Object Tracking            │
+│   Recording Engine       │                             │
 └──────────────────────┬──────────────────────────────────┘
                        │
              ┌─────────┴─────────┐
@@ -160,7 +160,7 @@ ViTCam pulls each stream and processes it locally. For on-premises cameras, no i
 
 | Component | Requirement |
 |-----------|-------------|
-| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Ubuntu 26.04 LTS (Raspberry Pi) |
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Raspberry Pi OS Debian Bookworm Legacy 64-bit |
 | CPU | 4 cores, x86_64 |
 | RAM | 8 GB |
 | Storage | 50 GB (for OS, app, and recordings) |
@@ -544,11 +544,11 @@ The backend will be available at `http://localhost:8765`. Sign in at `http://loc
 > docker compose -f docker-compose.yml -f docker-compose.s3.yml restart
 > ```
 
-### Raspberry Pi (Ubuntu 26.04 LTS)
+### Raspberry Pi (Debian Bookworm Legacy 64-bit)
 
-ViTCam runs on Raspberry Pi 4/5 with Ubuntu 26.04 LTS (64-bit) with support for the **Google Coral USB TPU** for hardware-accelerated AI inference. Without the Coral TPU, the backend runs in CPU inference mode — suitable for single-camera setups.
+ViTCam runs on Raspberry Pi 4/5 with Raspberry Pi OS Debian Bookworm Legacy (64-bit). The backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
 
-> **Tested on:** Raspberry Pi 4B / 5 running Ubuntu 26.04 LTS (64-bit). A 64-bit OS is required.
+> **Tested on:** Raspberry Pi 4B / 5 running Raspberry Pi OS Debian Bookworm Legacy (64-bit). A 64-bit OS is required.
 
 #### Option A — Automated Installer (recommended)
 
@@ -559,23 +559,24 @@ chmod +x install-raspberry-pi.sh
 ./install-raspberry-pi.sh
 ```
 
-The installer handles everything: Docker Engine, Node.js, Supabase via Docker Compose, Google Coral USB TPU drivers, pyenv, Python 3.10, all dependencies, frontend build, nginx, and systemd services. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then open `http://localhost:3000`.
+The installer handles everything in 8 steps: system dependencies, Docker Engine, Node.js, Supabase via Docker Compose, `.env` configuration, frontend build, Python via pyenv, backend dependencies, nginx, and systemd services (auto-start on reboot). After install, open `http://localhost:3000` and sign in.
 
 > On first run, compiling Python via pyenv on Raspberry Pi can take 10–20 minutes. This is normal.
 
 #### Option B — Manual Setup
 
-#### Step 1 — Install Docker
+#### Step 1 — System Dependencies & Docker
 
 ```bash
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl wget build-essential ffmpeg libgl1 libglib2.0-0 nginx
+
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
-newgrp docker
 ```
 
-> After adding your user to the `docker` group, **log out and back in** (or reboot) if `docker` commands still require sudo.
+> Use `sudo docker` for all docker commands in this session — the group change only takes effect after you next log in.
 
 #### Step 2 — Install Node.js
 
@@ -593,16 +594,14 @@ cd vitcam
 
 #### Step 4 — Set Up Supabase
 
-Clone the Supabase self-hosted Docker stack and start it:
-
 ```bash
 git clone --depth 1 https://github.com/supabase/supabase.git
 cd supabase/docker
 cp .env.example .env
-docker compose up --detach
+sudo docker compose up --detach
 ```
 
-> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a couple of minutes on first run.
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy.
 
 #### Step 5 — Apply the Database Schema
 
@@ -610,71 +609,28 @@ docker compose up --detach
 2. Log in — Username: `supabase` / Password: `this_password_is_insecure_and_should_be_updated`
 3. Navigate to **SQL Editor**
 4. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
-5. Paste its contents into the editor and click **Run**
+5. Paste its contents and click **Run**
 
-#### Step 6 — Create the First User
+#### Step 6 — Create the First User & Get API Keys
 
-1. In Supabase Studio go to **Authentication → Users**
-2. Click **Add User**, enter your email and password
-3. Set **Auto Confirm** to on so the account is immediately active
+1. Go to **Authentication → Users → Add User** — enter your email and password, enable **Auto Confirm**
+2. Go to **Project Settings → API** — copy the **URL** and **anon public** key
+3. Edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
 
-#### Step 6b — Get Your Supabase URL and Anon Key
-
-1. In Supabase Studio go to **Project Settings → API**
-2. Copy the **URL** and **anon public** key
-
-Then manually update these two files:
-
-- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
-
-#### Step 7 — Install Coral USB TPU Support
-
-Add the Google Coral package repository:
+#### Step 7 — Set Up Python with pyenv
 
 ```bash
-echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
-  | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+# Install build dependencies
+sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+  libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
+  xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/google-coral-edgetpu.gpg
-
-sudo apt modernize-sources
-sudo apt-get update
-```
-
-Install the Edge TPU runtime:
-
-```bash
-sudo apt-get install libedgetpu1-std    # standard clock (recommended, runs cooler)
-sudo apt-get install libedgetpu1-max    # max clock (faster, needs active cooling)
-```
-
-Verify the Coral USB TPU is detected:
-
-```bash
-lsusb
-```
-
-You should see a device with ID `1a6e:089a` or `18d1:9302` (labelled Global Unichip or Google).
-
-#### Step 8 — Set Up Python with pyenv
-
-Install build dependencies:
-
-```bash
-sudo apt update && sudo apt install -y build-essential libssl-dev zlib1g-dev \
-  libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-  libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev git
-```
-
-Install pyenv:
-
-```bash
+# Install pyenv
 curl https://pyenv.run | bash
 ```
 
-Add pyenv to your shell — append to `~/.bashrc`:
+Add to `~/.bashrc` then run `exec "$SHELL"`:
 
 ```bash
 export PYENV_ROOT="$HOME/.pyenv"
@@ -683,50 +639,29 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 ```
 
-Apply the changes:
-
-```bash
-exec "$SHELL"
-```
-
-#### Step 9 — Install Python and Backend Dependencies
-
 ```bash
 pyenv install 3.10.11
 pyenv global 3.10.11
+```
+
+#### Step 8 — Install Backend, Build Frontend & Start Services
+
+```bash
+# Backend dependencies
 cd ~/vitcam/server
 pip install -r requirements.txt
-```
 
-Install TFLite runtime and Coral inference support:
-
-```bash
-pip uninstall tensorflow tensorflow-aarch64
-pip install -U tflite-runtime
-pip install ultralytics
-```
-
-#### Step 10 — Build and Start the Frontend
-
-```bash
+# Build frontend
 cd ~/vitcam/frontend
-npm install
-npm run build
-npm start
-```
+npm install && npm run build
+npm start &
 
-The frontend will be available at `http://localhost:3000`.
-
-#### Step 11 — Start the Backend
-
-Open a new terminal tab:
-
-```bash
+# Start backend
 cd ~/vitcam/server
 python main.py
 ```
 
-The backend will be available at `http://localhost:8765`. Sign in at `http://localhost:3000` with the user you created in Step 6.
+Sign in at `http://localhost:3000` with the user you created in Step 6.
 
 ---
 
@@ -927,7 +862,5 @@ ViTCam is built on top of excellent open-source projects:
 
 - [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
 - [Supabase](https://supabase.com) — Open-source database and storage platform
-- [Ultralytics](https://ultralytics.com) — AI vision models and inference tools
 
 ---
-
