@@ -259,7 +259,26 @@ success ".env configuration done."
 header "Step 7 / 8 — Frontend"
 
 cd "$VITCAM_DIR/frontend"
-npm install --silent
+
+# npm with retries for unstable connections
+info "Installing frontend dependencies..."
+npm config set fetch-retries 5
+npm config set fetch-retry-mintimeout 20000
+npm config set fetch-retry-maxtimeout 120000
+
+NPM_SUCCESS=false
+for attempt in 1 2 3; do
+  info "npm install attempt $attempt of 3..."
+  if npm install --silent; then
+    NPM_SUCCESS=true
+    break
+  fi
+  warn "npm install failed — retrying in 10 seconds..."
+  sleep 10
+done
+
+$NPM_SUCCESS || error "Frontend dependencies failed to install after 3 attempts."
+
 npm run build
 success "Frontend built."
 
@@ -281,7 +300,16 @@ eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
 
 if ! pyenv versions 2>/dev/null | grep -q "$PYTHON_VERSION"; then
   info "Installing Python $PYTHON_VERSION (this takes several minutes on Raspberry Pi)..."
-  pyenv install "$PYTHON_VERSION"
+  PYENV_SUCCESS=false
+  for attempt in 1 2 3; do
+    if pyenv install "$PYTHON_VERSION"; then
+      PYENV_SUCCESS=true
+      break
+    fi
+    warn "Python build failed — retrying ($attempt of 3)..."
+    sleep 10
+  done
+  $PYENV_SUCCESS || error "Python $PYTHON_VERSION failed to install after 3 attempts."
 fi
 
 pyenv global "$PYTHON_VERSION"
@@ -299,7 +327,27 @@ fi
 
 # Backend dependencies
 cd "$VITCAM_DIR/server"
-pip install -q -r requirements.txt
+
+# pip with retries and extended timeout for unstable connections
+info "Installing backend dependencies (this may take a while on Raspberry Pi)..."
+PIP_OPTS="--retries 10 --timeout 120 --default-timeout 120"
+
+# Retry the whole install up to 3 times on network failure
+PIP_SUCCESS=false
+for attempt in 1 2 3; do
+  info "pip install attempt $attempt of 3..."
+  if pip install $PIP_OPTS -r requirements.txt; then
+    PIP_SUCCESS=true
+    break
+  fi
+  warn "pip install failed (network issue) — retrying in 10 seconds..."
+  sleep 10
+done
+
+if ! $PIP_SUCCESS; then
+  error "Backend dependencies failed to install after 3 attempts.\nCheck your internet connection and run manually:\n  cd $VITCAM_DIR/server && pip install -r requirements.txt"
+fi
+
 success "Backend dependencies installed."
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
