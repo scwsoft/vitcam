@@ -1,692 +1,867 @@
-# License
+# <img src="./docs/images/Logo.png" width="60" height="60" /><img src="./docs/images/ViTCam.png" width="150" height="60" />
+> **Self-hosted, on-premises AI camera surveillance, video analytics, and NVR platform**
 
-VitCam
-Copyright (C) 2026 Sean / SCW Software
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+**ViTCam is a fully local, on-premises AI-powered camera surveillance, video analytics, and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — ViTCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
+
+Unlike proprietary AI camera systems that lock you into specific hardware brands, subscription plans, or closed ecosystems, ViTCam works with **any IP camera, NVR, or DVR that supports standard streaming protocols** — no matter the manufacturer. Swap cameras, change hardware, or scale your setup at any time without penalty.
+
+Connect your existing IP cameras and NVR systems, and ViTCam layers AI-powered object detection, real-time video analytics, and motion-triggered recording on top — turning any camera setup into an intelligent surveillance system with deep insight into what's happening across your premises. **Your footage stays on your network. Always.**
+
+ViTCam's AI detection runs on **both GPU and CPU** — so you can get started on any machine and upgrade to a GPU later for higher frame rates and lower latency. A dedicated NVIDIA GPU is recommended for production workloads, but not required to run ViTCam.
+
+> **No lock-in. Ever.** No proprietary hardware required. No mandatory cloud subscription. No vendor software you must keep paying for. Just open-source software running on commodity hardware you already own.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [NVR & IP Camera Compatibility](#nvr--ip-camera-compatibility)
+- [Architecture Overview](#architecture-overview)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [Quick Start (Ubuntu)](#quick-start-ubuntu)
+  - [Windows Setup (Conda)](#windows-setup-conda)
+  - [macOS Setup](#macos-setup)
+  - [Raspberry Pi (Ubuntu 26.04 LTS)](#raspberry-pi-ubuntu-2604-lts)
+- [Configuration](#configuration)
+- [Screenshots](#screenshots)
+- [Usage](#usage)
+  - [Setting Up the Camera Server](#setting-up-the-camera-server)
+  - [Adding a Camera](#adding-a-camera)
+- [AI Models](#ai-models)
+- [License](#license)
+
+---
+
+## NVR & IP Camera Compatibility
+
+ViTCam supports multiple stream input protocols, so it works with a wide range of cameras, NVR systems, and even internet-based video sources — all processed and stored locally on your own machine.
+
+| Protocol | Source Examples | Notes |
+|----------|----------------|-------|
+| **RTSP** | IP cameras, NVR/DVR systems (Hikvision, Dahua, Reolink, Amcrest, etc.) | Primary protocol; recommended for on-premises cameras |
+| **HTTP / MJPEG** | Older IP cameras, embedded cameras, some IoT devices | Streams served as a continuous JPEG sequence over HTTP |
+| **YouTube Live** | Public live streams, traffic cams, public surveillance feeds | Useful for testing or monitoring public sources |
+| **USB / Local Camera** | Built-in laptop cameras, USB webcams attached to the ViTCam host | Referenced by device index using `local:<index>` (e.g. `local:0`) |
+| **ONVIF** | Standard-compliant IP cameras | 🔜 Auto-discovery coming soon |
+
+> ⚠️ **Privacy & legal notice:** When connecting to any public or third-party stream (e.g. YouTube Live or public webcams), ensure you have the right to access and process that feed. ViTCam does not condone unauthorized surveillance.
+
+### Stream URL Examples
+
+**RTSP — NVR / IP Cameras (recommended for on-premises):**
+
+```
+# Hikvision NVR — Channel 1
+rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101
+
+# Dahua NVR — Channel 2
+rtsp://admin:password@192.168.1.101:554/cam/realmonitor?channel=2&subtype=0
+
+# Reolink camera
+rtsp://admin:password@192.168.1.102:554/h264Preview_01_main
+
+# Generic
+rtsp://username:password@<camera-ip>:<port>/<stream-path>
+```
+
+**HTTP / MJPEG:**
+
+```
+http://<camera-ip>/video.mjpg
+http://<camera-ip>/mjpeg/1
+http://username:password@<camera-ip>:<port>/videostream.cgi
+```
+
+**YouTube Live:**
+
+```
+https://www.youtube.com/watch?v=<live-stream-id>
+```
+
+**USB / Local Camera:**
+
+```
+# Built-in camera or first USB webcam
+local:0
+
+# Second USB camera (if multiple are connected)
+local:1
+```
+
+> On Windows (WSL2), local cameras are accessed via the host. If `local:0` isn't detected, ensure the camera is not in use by another application.
+
+ViTCam pulls each stream and processes it locally. For on-premises cameras, no internet access or port forwarding is required.
+
+---
+
+## Features
+
+### Core (Free & Open Source)
+
+- **Live WebRTC streaming** — Low-latency real-time video feeds from multiple cameras in your browser
+- **AI object detection (toggleable)** — Enable or disable AI detection per camera with a single toggle. When off, ViTCam operates as a standard CCTV monitor and NVR — streaming and recording without any AI processing overhead
+- **GPU & CPU inference** — Runs on NVIDIA CUDA GPUs for maximum performance; falls back to CPU automatically so detection works on any machine, including laptops and macOS
+- **Object tracking** — Multi-object tracking with persistent IDs across frames
+- **Motion-triggered recording** — Automatically records video clips when motion or detections are detected
+- **Continuous recording mode** — Always-on recording
+- **Detection event storage** — All events stored in Supabase with timestamps, bounding boxes, and confidence scores
+- **Video analytics dashboard** — Visualize detection trends, object counts, dwell times, heatmaps, and per-camera activity over time — hourly, daily, and weekly views
+- **People & vehicle counting** — Real-time and historical counts of people and vehicles passing through a scene
+- **Dwell time tracking** — Measure how long tracked objects remain in a zone
+- **Multi-camera management** — Add, configure, and monitor multiple camera streams from one interface
+- **Video management** — Browse and review recorded footage with Supabase Storage backend
+- **System logs viewer** — Real-time and historical system log access from the UI
+- **Datetime overlay** — Configurable timestamp overlays on video streams
+- **Self-hostable** — Runs entirely on your own hardware; your data never leaves your network
+
+### AI Capabilities
+
+- Person detection, counting, and dwell time analysis
+- Vehicle detection and classification (car, truck, motorcycle, bus)
+- Drone / UAV detection
+- Safety helmet / PPE compliance detection
+- Per-camera detection event logging with snapshot capture
+- Custom model support (PyTorch `.pth`)
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        Browser                          │
+│                   Web Interface (UI)                    │
+└──────────────────────┬──────────────────────────────────┘
+                       │ WebRTC / REST / Realtime
+┌──────────────────────▼──────────────────────────────────┐
+│                  Camera Server                          │
+│   Live Streaming Engine  │  REST API                   │
+│   AI Detection           │  Object Tracking            │
+│   Recording Engine       │                             │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+          Database             Storage
+      Auth, Events           Video Clips
+```
+
+---
+
+## Requirements
+
+### Minimum
+
+| Component | Requirement |
+|-----------|-------------|
+| OS | Ubuntu 22.04 / 24.04 LTS (recommended), Debian 12, Windows 10/11 (Conda), macOS 13+, Ubuntu 26.04 LTS (Raspberry Pi) |
+| CPU | 4 cores, x86_64 |
+| RAM | 8 GB |
+| Storage | 50 GB (for OS, app, and recordings) |
+| GPU | Optional — CPU inference is supported out of the box; an NVIDIA GPU is recommended for real-time multi-camera workloads |
+| Node.js | 18 or later |
+| Python | 3.10 or later |
+
+> **No GPU? No problem.** ViTCam automatically falls back to CPU-based inference if no CUDA-capable GPU is detected. CPU mode is suitable for testing, low-camera-count setups, and macOS. For real-time detection across multiple streams, an NVIDIA RTX GPU with CUDA is recommended.
+
+### Recommended (for real-time multi-camera AI workloads)
+
+| Component | Recommendation |
+|-----------|----------------|
+| GPU | NVIDIA RTX 3060 or better (e.g., RTX 5090 or higher) |
+| VRAM | 8 GB minimum |
+| CUDA | 12.x |
+| RAM | 16–32 GB |
+
+> For single-camera setups or development, a modern CPU (e.g. Apple M-series, Intel Core i7+) is sufficient with no GPU required.
+
+---
+
+## Installation
+
+### Quick Start (Ubuntu)
+
+#### Fresh Ubuntu Server (logged in as root)
+
+```bash
+apt update && apt install -y git
+git clone https://github.com/scwsoft/vitcam.git
+bash vitcam/setup/install-linux.sh
+```
+
+#### Standard Ubuntu (user with sudo)
+
+```bash
+sudo apt update && sudo apt install -y git
+git clone https://github.com/scwsoft/vitcam.git
+sudo bash vitcam/setup/install-linux.sh
+```
+
+The installer will automatically:
+
+1. Install system dependencies (ffmpeg, build tools, nginx)
+2. Detect and install NVIDIA CUDA drivers if a GPU is present — falls back to CPU mode if not
+3. Install and start Docker Engine (or connect to host Docker socket if inside a container)
+4. Install Node.js 22
+5. Clone and start Supabase via Docker Compose, apply the database schema
+6. Pause and prompt you to update your `.env` files with Supabase keys
+7. Install Python 3.10 via pyenv and all backend dependencies
+8. Build the Next.js frontend and deploy via nginx (port 80) + systemd services (auto-start on reboot)
+
+Once complete, open **Supabase Studio at `http://localhost:8000`** — log in with username `supabase` and password `this_password_is_insecure_and_should_be_updated`. Go to **Authentication → Users** to create your ViTCam login account, then open `http://localhost:3000`.
+
+**Service management after install:**
+
+```bash
+systemctl status vitcam-frontend
+systemctl status vitcam-server
+journalctl -u vitcam-server -f      # live server logs
+journalctl -u vitcam-frontend -f    # live frontend logs
+systemctl restart vitcam-server
+```
+
+#### Manual Installation (Ubuntu)
+
+If you prefer to install manually without the automated script:
+
+```bash
+# 1. System dependencies
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl wget build-essential ffmpeg libgl1 libglib2.0-0 nginx
+
+# 2. Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+newgrp docker
+
+# 3. Node.js
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 4. Clone ViTCam
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+
+# 5. Supabase
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker && cp .env.example .env
+docker compose up --detach
+cd ../..
+
+# 6. Python via pyenv
+curl https://pyenv.run | bash
+# Add pyenv to ~/.bashrc then:
+exec "$SHELL"
+pyenv install 3.10.11 && pyenv global 3.10.11
+
+# 7. Backend dependencies
+cd server && pip install -r requirements.txt && cd ..
+
+# 8. Frontend
+cd frontend && npm install && npm run build && cd ..
+```
+
+Open **Supabase Studio at `http://localhost:8000`** — log in with username `supabase` and password `this_password_is_insecure_and_should_be_updated`. Go to **Authentication → Users** to add your login account, copy the API keys from **Project Settings → API**, and update `server/.env` and `frontend/.env` with your `SUPABASE_URL` and keys.
+
+---
+
+### Windows Setup (Conda)
+
+ViTCam supports two backend setup paths on Windows. For the fastest setup, use the provided PowerShell installer which handles Supabase, Conda environment, PyTorch, frontend build, and startup scripts automatically.
+
+> **Prerequisites:** [Git for Windows](https://git-scm.com/download/win), [Node.js 18+](https://nodejs.org/), [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (running), [Anaconda / Miniconda](https://docs.conda.io/en/latest/miniconda.html), and an NVIDIA GPU with the latest [NVIDIA drivers](https://www.nvidia.com/Download/index.aspx).
+
+#### Option A — Automated Installer (recommended)
+
+Open **Anaconda Prompt** (so `conda` is active on PATH) and run:
+
+```powershell
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam\setup
+```
+
+Then run the installer from within the conda base environment:
+
+```powershell
+(base) .\install-windows.bat
+```
+
+> The installer must be run from **Anaconda Prompt** — `conda` must be available on PATH for the environment setup to work. The `.bat` file handles PowerShell execution policy automatically.
+
+After install, go to **Supabase Studio at `http://localhost:54323` → Authentication → Users** to create your first login account, then update your `.env` files with your Supabase URL and anon key (found under **Project Settings → API**), and open `http://localhost:3000`.
+
+#### Option B — Manual Setup
+
+#### Step 1 — Clone the Repository (Windows)
+
+Open **PowerShell** or **Command Prompt** and run:
+
+```powershell
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+```
+
+#### Step 2 — Set Up Supabase (Windows)
+
+Install the Supabase CLI globally and start the local Supabase stack:
+
+```powershell
+npm install -g supabase
+supabase start
+```
+
+> Supabase requires Docker Desktop. Make sure it is running before this step.
+
+Once started, Supabase will print your local API URL and anon key in the terminal output.
+
+#### Step 3 — Apply the Database Schema (Windows)
+
+1. Open **Supabase Studio** at `http://localhost:54323`
+2. Navigate to the **SQL Editor**
+3. Open `dbschema.sql` from the `server/` folder of your cloned `vitcam` directory
+4. Paste its contents into the editor and click **Run**
+
+#### Step 4 — Create the First User (Windows)
+
+1. In Supabase Studio, go to **Authentication → Users**
+2. Click **Add User**, enter your email and password
+3. Set **Auto Confirm** to on so the account is immediately active
+
+#### Step 4b — Get Your Supabase URL and Anon Key (Windows)
+
+1. Open Supabase Studio at `http://localhost:54323`
+2. Go to **Project Settings → API**
+3. Copy the **URL** and **anon public** key
+
+Then manually update these two files:
+
+- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
+
+#### Step 5 — Install and Start the Backend
+
+**Conda Environment (native Windows)**
+
+> **Prerequisites:** [Anaconda](https://www.anaconda.com/download) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on Windows.
+
+Open **Anaconda Prompt** (or any terminal with `conda` on the PATH) and navigate to the server folder:
+
+```powershell
+cd <vitcam-dir>\server
+```
+
+Create and activate the environment, then install dependencies:
+
+```powershell
+conda create -n vit-server python=3.10.11 -y
+conda activate vit-server
+pip install -r requirements.txt
+```
+
+Install PyTorch with CUDA 12.8 support (Blackwell / sm_120 compatible):
+
+```powershell
+pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+Verify CUDA is detected before starting the server:
+
+```powershell
+python -c "import torch; print('CUDA Available:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
+```
+
+You should see `CUDA Available: True` and your GPU name. Then start the server:
+
+```powershell
+python main.py
+```
+
+> Each time you return to work on the server, re-activate the environment first: `conda activate vit-server`.
+
+> **Supabase connection error?** If the server fails to start with an invalid URL or connection error, your `SUPABASE_URL` and `SUPABASE_KEY` in `server/.env` have not been set yet. Update them with the values from Supabase Studio (**Project Settings → API**), then set them as environment variables for the current session and re-run:
+>
+> ```powershell
+> $env:SUPABASE_URL = "http://localhost:54321"
+> $env:SUPABASE_KEY = "your-anon-key"
+> python main.py
+> ```
+
+#### Step 6 — Build and Start the Frontend (Windows)
+
+Back in your **Windows** terminal:
+
+```powershell
+cd frontend
+npm install
+npm run build
+npm start
+```
+
+The frontend will be available at `http://localhost:3000`. Sign in with the user you created in Step 4.
+
+---
+
+### macOS Setup
+
+ViTCam runs on macOS for both development and production use on lower-camera-count setups. CUDA is not available on Apple Silicon, but ViTCam's AI detection automatically runs on CPU — enabling real-time object detection without a discrete GPU.
+
+> **Prerequisites:** [Homebrew](https://brew.sh/), [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (running).
+
+#### Option A — Automated Installer (recommended)
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam/setup
+chmod +x install-macos.sh
+./install-macos.sh
+```
+
+The installer handles everything: Supabase via Docker Compose with S3/MinIO storage backend (fixes the macOS xattr issue), pyenv, Python, backend deps, frontend build, nginx, and launchd service management. After install, create your first user in **Supabase Studio at `http://localhost:8000` → Authentication → Users**, then update your `.env` files with your Supabase URL and anon key, and open `http://localhost:3000`.
+
+#### Option B — Manual Setup
+
+#### Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam/setup
+```
+
+#### Step 2 — Set Up Supabase (macOS)
+
+Install Docker Desktop first, then clone and start the Supabase self-hosted Docker stack.
+
+> ⚠️ **macOS xattr issue:** Docker Desktop on macOS does not support extended attributes on bind-mounted volumes, which prevents Supabase Storage from saving files. The fix is to use `docker-compose.s3.yml` which spins up a local MinIO container as the storage backend — running entirely inside Docker's Linux layer where xattr is fully supported.
+
+```bash
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker
+cp .env.example .env
+```
+
+Pull the latest images and start with the S3/MinIO storage override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.s3.yml pull
+docker compose -f docker-compose.yml -f docker-compose.s3.yml up --detach
+```
+
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy. This may take a few minutes on first run.
+
+#### Step 3 — Apply the Database Schema
+
+1. Open **Supabase Studio** at `http://localhost:8000`
+2. Log in with default credentials: **Username:** `supabase` / **Password:** `this_password_is_insecure_and_should_be_updated`
+3. Navigate to **SQL Editor**
+4. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
+5. Paste the contents and click **Run**
+
+#### Step 4 — Create the First User
+
+1. In Supabase Studio, go to **Authentication → Users**
+2. Click **Add User**, enter your email and password
+3. Enable **Auto Confirm** so the account is immediately active
+
+#### Step 4b — Get Your Supabase URL and Anon Key (macOS)
+
+1. In Supabase Studio go to **Project Settings → API**
+2. Copy the **URL** and **anon public** key
+
+Then manually update these two files:
+
+- **Frontend:** edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Server:** edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
+
+#### Step 5 — Set Up the Python Environment (Backend)
+
+Install `pyenv` to manage the Python version:
+
+```bash
+brew update
+brew install pyenv
+```
+
+Add `pyenv` to your shell (zsh is the default on macOS):
+
+```bash
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init --path)"' >> ~/.zshrc
+echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Install and set Python 3.10:
+
+```bash
+pyenv install 3.10.19
+pyenv global 3.10.19
+python --version   # Should print Python 3.10.19
+```
+
+#### Step 6 — Install Backend Dependencies
+
+```bash
+cd vitcam/server
+pip install -r requirements.txt
+```
+
+> On Apple Silicon (M1/M2/M3/M4), if `opencv-python` fails run `pip install opencv-python-headless` instead.
+
+#### Step 7 — Build and Start the Frontend
+
+```bash
+cd vitcam/frontend
+npm install
+npm run build
+npm start
+```
+
+The frontend will be available at `http://localhost:3000`.
+
+#### Step 8 — Start the Backend
+
+Open a new terminal tab:
+
+```bash
+cd vitcam/server
+python main.py
+```
+
+The backend will be available at `http://localhost:8765`. Sign in at `http://localhost:3000` with the user you created in Step 4.
+
+> **To manage Supabase after install:**
+> ```bash
+> cd vitcam/supabase/docker
+> docker compose -f docker-compose.yml -f docker-compose.s3.yml ps
+> docker compose -f docker-compose.yml -f docker-compose.s3.yml restart
+> ```
+
+### Raspberry Pi (Ubuntu 26.04 LTS)
+
+ViTCam runs on Raspberry Pi 4/5 with Ubuntu 26.04 LTS (64-bit). The backend runs in CPU inference mode — suitable for single-camera setups or lightweight monitoring.
+
+> **Tested on:** Raspberry Pi 4B / 5 running Ubuntu 26.04 LTS (64-bit). A 64-bit OS is required.
+
+#### Option A — Automated Installer (recommended)
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam/setup
+chmod +x install-raspberry-pi.sh
+./install-raspberry-pi.sh
+```
+
+The installer handles everything in 8 steps: system dependencies, Docker Engine, Node.js, Supabase via Docker Compose, `.env` configuration, frontend build, Python via pyenv, backend dependencies, nginx, and systemd services (auto-start on reboot). After install, open `http://localhost:3000` and sign in.
+
+> On first run, compiling Python via pyenv on Raspberry Pi can take 10–20 minutes. This is normal.
+
+#### Option B — Manual Setup
+
+#### Step 1 — System Dependencies & Docker
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl wget build-essential ffmpeg libgl1 libglib2.0-0 nginx
+
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+> Use `sudo docker` for all docker commands in this session — the group change only takes effect after you next log in.
+
+#### Step 2 — Install Node.js
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+#### Step 3 — Clone the Repository
+
+```bash
+git clone https://github.com/scwsoft/vitcam.git
+cd vitcam
+```
+
+#### Step 4 — Set Up Supabase
+
+```bash
+git clone --depth 1 https://github.com/supabase/supabase.git
+cd supabase/docker
+cp .env.example .env
+sudo docker compose up --detach
+```
+
+> Supabase Studio will be available at `http://localhost:8000` once all containers are healthy.
+
+#### Step 5 — Apply the Database Schema
+
+1. Open **Supabase Studio** at `http://localhost:8000`
+2. Log in — Username: `supabase` / Password: `this_password_is_insecure_and_should_be_updated`
+3. Navigate to **SQL Editor**
+4. Open `dbschema.sql` from the `server/` folder of your `vitcam` directory
+5. Paste its contents and click **Run**
+
+#### Step 6 — Create the First User & Get API Keys
+
+1. Go to **Authentication → Users → Add User** — enter your email and password, enable **Auto Confirm**
+2. Go to **Project Settings → API** — copy the **URL** and **anon public** key
+3. Edit `vitcam/frontend/.env` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Edit `vitcam/server/.env` and set `SUPABASE_URL` and `SUPABASE_KEY`
+
+#### Step 7 — Set Up Python with pyenv
+
+```bash
+# Install build dependencies
+sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+  libreadline-dev libsqlite3-dev llvm libncurses5-dev libncursesw5-dev \
+  xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+# Install pyenv
+curl https://pyenv.run | bash
+```
+
+Add to `~/.bashrc` then run `exec "$SHELL"`:
+
+```bash
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+```
+
+```bash
+pyenv install 3.10.11
+pyenv global 3.10.11
+```
+
+#### Step 8 — Install Backend, Build Frontend & Start Services
+
+```bash
+# Backend dependencies
+cd ~/vitcam/server
+pip install -r requirements.txt
+
+# Build frontend
+cd ~/vitcam/frontend
+npm install && npm run build
+npm start &
+
+# Start backend
+cd ~/vitcam/server
+python main.py
+```
+
+Sign in at `http://localhost:3000` with the user you created in Step 6.
+
+---
+
+## Configuration
+
+All configuration is managed via a `.env` file in the server directory. Copy `.env.example` to get started:
+
+```bash
+cp .env.example .env
+```
+
+### Key Environment Variables
+
+```env
+# ─── Supabase ───────────────────────────────────────────
+SUPABASE_URL=http://localhost:54321
+SUPABASE_KEY=your-anon-key
+
+# ─── Server ─────────────────────────────────────────────
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8765
+
+# ─── Recording ──────────────────────────────────────────
+DEFAULT_CODEC=VP9
+DEFAULT_CONTAINER=webm
+DEFAULT_RESOLUTION=640x480
+DEFAULT_FPS=30
+
+# ─── Performance ────────────────────────────────────────
+LOG_BUFFER_SIZE=50
+LOG_FLUSH_INTERVAL=10.0
+PERFORMANCE_LOG_INTERVAL=60.0
+
+# ─── Motion Detection ───────────────────────────────────
+DEFAULT_SENSITIVITY=20
+DEFAULT_AREA_THRESHOLD=5000
+
+# ─── WebRTC STUN/TURN ───────────────────────────────────
+WEBRTC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+WEBRTC_TURN_SERVER=turn:127.0.0.1:3478
+WEBRTC_TURN_USERNAME=webrtc
+WEBRTC_TURN_CREDENTIAL=webrtc123
+
+# ─── AI Model ───────────────────────────────────────────
+# Options: Nano, Small, Medium, Large, Custom
+MODEL_SIZE=Nano
+MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
+```
+
+> **Supabase keys:** After running `supabase start`, the CLI prints your local `API URL` and `anon key`. Use those values for `SUPABASE_URL` and `SUPABASE_KEY`. For Supabase Cloud, find them under **Project Settings → API**.
+
+> **Model checkpoint:** Place your `.pth` checkpoint file under `checkpoints/<model-name>/` and set `MODEL_CHECKPOINT_PATH` accordingly. Set `MODEL_SIZE` to `Custom` when using a non-standard checkpoint.
+
+### Camera Configuration
+
+Cameras are configured through the ViTCam UI under **Settings → Cameras**. Each camera supports:
+
+- RTSP stream URL or local device index (e.g. `local:0`)
+- Display name and location label
+- **AI detection toggle** — enable for smart detection, disable for standard CCTV/NVR mode
+- Detection model selection (when AI detection is enabled)
+- Recording mode override
+- Datetime overlay position and format
+
+### AI Detection vs. Standard NVR Mode
+
+Each camera can operate in one of two modes:
+
+| Mode | Description |
+|------|-------------|
+| **Standard NVR** (AI off) | Live streaming and continuous or motion-triggered recording with no AI processing. Lightweight — runs on any hardware. |
+| **AI Detection** (AI on) | Adds real-time RF-DETR object detection, object tracking, detection event logging, and snapshot capture on top of standard recording. Recommended with a GPU for multi-camera setups. |
+
+You can mix modes across cameras — for example, run AI detection on entrance cameras while keeping indoor cameras in standard NVR mode to save resources.
+
+---
+
+## Screenshots
+
+<img src="./docs/images/VitCam-Live.gif" />
+
+<img src="./docs/images/VitCam-Live2.gif" />
+
+---
+
+## Usage
+
+### Accessing the Dashboard
+
+Navigate to `http://localhost:3000` (or your server's IP/domain) and sign in.
+
+### Setting Up the Camera Server
+
+Before adding cameras, configure the connection to the ViTCam camera server:
+
+1. Go to **Settings → General**
+2. Enter the **Server URL** — set the protocol, IP address, and port:
+   - Protocol: `ws`
+   - IP: `127.0.0.1` (or your server's IP if running remotely)
+   - Port: `8765`
+   - Example: `ws://127.0.0.1:8765`
+3. Click **Connect** to verify the server is reachable — the status indicator will confirm online/offline
+4. Once the server shows as online, click **Save Settings**
+
+> If the server shows as offline, check the server service is running: `sudo systemctl status vitcam-server`
+
+### Adding a Camera
+
+1. Go to **Cameras** → **Add Camera**
+2. Enter the stream URL (e.g. `rtsp://admin:password@192.168.1.100:554/stream1` or `local:0` for a built-in camera)
+3. Toggle **AI Detection** on or off
+   - **On** — choose a detection model; ViTCam will run real-time object detection on this stream
+   - **Off** — camera runs in standard NVR mode (streaming and recording only, no AI overhead)
+4. Click **Save** — the stream will appear on the main dashboard within seconds
+
+### Viewing Live Streams
+
+The **Dashboard** page shows all active camera feeds in a grid layout. Click any feed to expand it to full view. For cameras with AI Detection enabled, bounding boxes and labels are overlaid in real time. Cameras in standard NVR mode display a clean feed with no overlays.
+
+### Reviewing Recordings
+
+Go to **Video Management** to browse recorded clips organized by camera and date. Clips can be previewed, downloaded, or deleted from this view.
+
+### Detection Events
+
+The **Events** page shows a chronological log of all detection events with:
+
+- Timestamp and camera source
+- Detected object class and confidence score
+- Snapshot thumbnail
+- Bounding box coordinates
+
+### Video Analytics
+
+The **Analytics** dashboard gives you deep insight into activity across all your cameras:
+
+- Detection counts over time (hourly, daily, weekly views)
+- People and vehicle counts per camera
+- Dwell time analysis — see how long objects linger in a scene
+- Object class breakdown (pie/bar charts)
+- Per-camera activity heatmaps
+- Detection event timeline with snapshot thumbnails
+- Recording storage usage
+
+---
+
+## AI Models
+
+ViTCam's AI detection works out of the box for common surveillance scenarios — people, vehicles, drones, and safety equipment. Detection models can be assigned per camera directly from the settings UI.
+
+### Model Add-Ons *(coming soon)*
+
+As the ViTCam community grows, we want to make it easier for users to extend detection capabilities beyond the defaults. We are working on a set of purpose-built model add-ons contributed by and built for the community — covering real-world use cases that users have asked for:
+
+- Drone and UAV detection
+- PPE and safety compliance monitoring
+- Vehicle classification and counting
+- Crowd and occupancy analytics
+- Industry-specific scenarios
+
+The goal is to give every ViTCam user access to models that are ready to use without needing to train or configure anything. More details coming soon.
+
+---
+
+
+## License
+
+ViTCam Community Edition is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+This means:
+
+- You are free to use, modify, and distribute this software
+- If you run a modified version as a network service (e.g., a SaaS product), you **must** release your modifications under AGPL-3.0
+- Attribution to the original project is required
+
+See [LICENSE](LICENSE) for the full license text.
+
+```
+ViTCam — AI-Powered Camera Surveillance Platform
+Copyright (C) 2024  Sean (ViTCam Contributors)
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public
-License along with this program. If not, see
-<https://www.gnu.org/licenses/>.
-
-If your version of the software can interact with users remotely
-through a computer network, you should also make sure that it
-provides a way for users to get its source. See section 13 below
-for the specific requirements.
+```
 
 ---
 
-## Full License Text
+## Acknowledgements
 
-```
+ViTCam is built on top of excellent open-source projects:
 
-                    GNU AFFERO GENERAL PUBLIC LICENSE
-                       Version 3, 19 November 2007
+- [RF-DETR](https://github.com/roboflow/rf-detr) — Real-time object detection
+- [Supabase](https://supabase.com) — Open-source database and storage platform
 
- Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
+---
 
-                            Preamble
-
-  The GNU Affero General Public License is a free, copyleft license for
-software and other kinds of works, specifically designed to ensure
-cooperation with the community in the case of network server software.
-
-  The licenses for most software and other practical works are designed
-to take away your freedom to share and change the works.  By contrast,
-our General Public Licenses are intended to guarantee your freedom to
-share and change all versions of a program--to make sure it remains free
-software for all its users.
-
-  When we speak of free software, we are referring to freedom, not
-price.  Our General Public Licenses are designed to make sure that you
-have the freedom to distribute copies of free software (and charge for
-them if you wish), that you receive source code or can get it if you
-want it, that you can change the software or use pieces of it in new
-free programs, and that you know you can do these things.
-
-  Developers that use our General Public Licenses protect your rights
-with two steps: (1) assert copyright on the software, and (2) offer
-you this License which gives you legal permission to copy, distribute
-and/or modify the software.
-
-  A secondary benefit of defending all users' freedom is that
-improvements made in alternate versions of the program, if they
-receive widespread use, become available for other developers to
-incorporate.  Many developers of free software are heartened and
-encouraged by the resulting cooperation.  However, in the case of
-software used on network servers, this result may fail to come about.
-The GNU General Public License permits making a modified version and
-letting the public access it on a server without ever releasing its
-source code to the public.
-
-  The GNU Affero General Public License is designed specifically to
-ensure that, in such cases, the modified source code becomes available
-to the community.  It requires the operator of a network server to
-provide the source code of the modified version running there to the
-users of that server.  Therefore, public use of a modified version, on
-a publicly accessible server, gives the public access to the source
-code of the modified version.
-
-  An older license, called the Affero General Public License and
-published by Affero, was designed to accomplish similar goals.  This is
-a different license, not a version of the Affero GPL, but Affero has
-released a new version of the Affero GPL which permits relicensing under
-this license.
-
-  The precise terms and conditions for copying, distribution and
-modification follow.
-
-                       TERMS AND CONDITIONS
-
-  0. Definitions.
-
-  "This License" refers to version 3 of the GNU Affero General Public License.
-
-  "Copyright" also means copyright-like laws that apply to other kinds of
-works, such as semiconductor masks.
-
-  "The Program" refers to any copyrightable work licensed under this
-License.  Each licensee is addressed as "you".  "Licensees" and
-"recipients" may be individuals or organizations.
-
-  To "modify" a work means to copy from or adapt all or part of the work
-in a fashion requiring copyright permission, other than the making of an
-exact copy.  The resulting work is called a "modified version" of the
-earlier work or a work "based on" the earlier work.
-
-  A "covered work" means either the unmodified Program or a work based
-on the Program.
-
-  To "propagate" a work means to do anything with it that, without
-permission, would make you directly or secondarily liable for
-infringement under applicable copyright law, except executing it on a
-computer or modifying a private copy.  Propagation includes copying,
-distribution (with or without modification), making available to the
-public, and in some countries other activities as well.
-
-  To "convey" a work means any kind of propagation that enables other
-parties to make or receive copies.  Mere interaction with a user through
-a computer network, with no transfer of a copy, is not conveying.
-
-  An interactive user interface displays "Appropriate Legal Notices"
-to the extent that it includes a convenient and prominently visible
-feature that (1) displays an appropriate copyright notice, and (2)
-tells the user that there is no warranty for the work (except to the
-extent that warranties are provided), that licensees may convey the
-work under this License, and how to view a copy of this License.  If
-the interface presents a list of user commands or options, such as a
-menu, a prominent item in the list meets this criterion.
-
-  1. Source Code.
-
-  The "source code" for a work means the preferred form of the work
-for making modifications to it.  "Object code" means any non-source
-form of a work.
-
-  A "Standard Interface" means an interface that either is an official
-standard defined by a recognized standards body, or, in the case of
-interfaces specified for a particular programming language, one that
-is widely used among developers working in that language.
-
-  The "System Libraries" of an executable work include anything, other
-than the work as a whole, that (a) is included in the normal form of
-packaging a Major Component, but which is not part of that Major
-Component, and (b) serves only to enable use of the work with that
-Major Component, or to implement a Standard Interface for which an
-implementation is available to the public in source code form.  A
-"Major Component", in this context, means a major essential component
-(kernel, window system, and so on) of the specific operating system
-(if any) on which the executable work runs, or a compiler used to
-produce the work, or an object code interpreter used to run it.
-
-  The "Corresponding Source" for a work in object code form means all
-the source code needed to generate, install, and (for an executable
-work) run the object code and to modify the work, including scripts to
-control those activities.  However, it does not include the work's
-System Libraries, or general-purpose tools or generally available free
-programs which are used unmodified in performing those activities but
-which are not part of the work.  For example, Corresponding Source
-includes interface definition files associated with source files for
-the work, and the source code for shared libraries and dynamically
-linked subprograms that the work is specifically designed to require,
-such as by intimate data communication or control flow between those
-subprograms and other parts of the work.
-
-  The Corresponding Source need not include anything that users
-can regenerate automatically from other parts of the Corresponding
-Source.
-
-  The Corresponding Source for a work in source code form is that
-same work.
-
-  2. Basic Permissions.
-
-  All rights granted under this License are granted for the term of
-copyright on the Program, and are irrevocable provided the stated
-conditions are met.  This License explicitly affirms your unlimited
-permission to run the unmodified Program.  The output from running a
-covered work is covered by this License only if the output, given its
-content, constitutes a covered work.  This License acknowledges your
-rights of fair use or other equivalent, as provided by copyright law.
-
-  You may make, run and propagate covered works that you do not
-convey, without conditions so long as your license otherwise remains
-in force.  You may convey covered works to others for the sole purpose
-of having them make modifications exclusively for you, or provide you
-with facilities for running those works, provided that you comply with
-the terms of this License in conveying all material for which you do
-not control copyright.  Those thus making or running the covered works
-for you must do so exclusively on your behalf, under your direction
-and control, on terms that prohibit them from making any copies of
-your copyrighted material outside their relationship with you.
-
-  Conveying under any other circumstances is permitted solely under
-the conditions stated below.  Sublicensing is not allowed; section 10
-makes it unnecessary.
-
-  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
-
-  No covered work shall be deemed part of an effective technological
-measure under any applicable law fulfilling obligations under article
-11 of the WIPO copyright treaty adopted on 20 December 1996, or
-similar laws prohibiting or restricting circumvention of such
-measures.
-
-  When you convey a covered work, you waive any legal power to forbid
-circumvention of technological measures to the extent such circumvention
-is effected by exercising rights under this License with respect to
-the covered work, and you disclaim any intention to limit operation or
-modification of the work as a means of enforcing, against the work's
-users, your or third parties' legal rights to forbid circumvention of
-technological measures.
-
-  4. Conveying Verbatim Copies.
-
-  You may convey verbatim copies of the Program's source code as you
-receive it, in any medium, provided that you conspicuously and
-appropriately publish on each copy an appropriate copyright notice;
-keep intact all notices stating that this License and any
-non-permissive terms added in accord with section 7 apply to the code;
-keep intact all notices of the absence of any warranty; and give all
-recipients a copy of this License along with the Program.
-
-  You may charge any price or no price for each copy that you convey,
-and you may offer support or warranty protection for a fee.
-
-  5. Conveying Modified Source Versions.
-
-  You may convey a work based on the Program, or the modifications to
-produce it from the Program, in the form of source code under the
-terms of section 4, provided that you also meet all of these conditions:
-
-    a) The work must carry prominent notices stating that you modified
-    it, and giving a relevant date.
-
-    b) The work must carry prominent notices stating that it is
-    released under this License and any conditions added under section
-    7.  This requirement modifies the requirement in section 4 to
-    "keep intact all notices".
-
-    c) You must license the entire work, as a whole, under this
-    License to anyone who comes into possession of a copy.  This
-    License will therefore apply, along with any applicable section 7
-    additional terms, to the whole of the work, and all its parts,
-    regardless of how they are packaged.  This License gives no
-    permission to license the work in any other way, but it does not
-    invalidate such permission if you have separately received it.
-
-    d) If the work has interactive user interfaces, each must display
-    Appropriate Legal Notices; however, if the Program has interactive
-    interfaces that do not display Appropriate Legal Notices, your
-    work need not make them do so.
-
-  A compilation of a covered work with other separate and independent
-works, which are not by their nature extensions of the covered work,
-and which are not combined with it such as to form a larger program,
-in or on a volume of a storage or distribution medium, is called an
-"aggregate" if the compilation and its resulting copyright are not
-used to limit the access or legal rights of the compilation's users
-beyond what the individual works permit.  Inclusion of a covered work
-in an aggregate does not cause this License to apply to the other
-parts of the aggregate.
-
-  6. Conveying Non-Source Forms.
-
-  You may convey a covered work in object code form under the terms
-of sections 4 and 5, provided that you also convey the
-machine-readable Corresponding Source under the terms of this License,
-in one of these ways:
-
-    a) Convey the object code in, or embodied in, a physical product
-    (including a physical distribution medium), accompanied by the
-    Corresponding Source fixed on a durable physical medium
-    customarily used for software interchange.
-
-    b) Convey the object code in, or embodied in, a physical product
-    (including a physical distribution medium), accompanied by a
-    written offer, valid for at least three years and valid for as
-    long as you offer spare parts or customer support for that product
-    model, to give anyone who possesses the object code either (1) a
-    copy of the Corresponding Source for all the software in the
-    product that is covered by this License, on a durable physical
-    medium customarily used for software interchange, for a price no
-    more than your reasonable cost of physically performing this
-    conveying of source, or (2) access to copy the
-    Corresponding Source from a network server at no charge.
-
-    c) Convey individual copies of the object code with a copy of the
-    written offer to provide the Corresponding Source.  This
-    alternative is allowed only occasionally and noncommercially, and
-    only if you received the object code with such an offer, in accord
-    with subsection 6b.
-
-    d) Convey the object code by offering access from a designated
-    place (gratis or for a charge), and offer equivalent access to the
-    Corresponding Source in the same way through the same place at no
-    further charge.  You need not require recipients to copy the
-    Corresponding Source along with the object code.  If the place to
-    copy the object code is a network server, the Corresponding Source
-    may be on a different server (operated by you or a third party)
-    that supports equivalent copying facilities, provided you maintain
-    clear directions next to the object code saying where to find the
-    Corresponding Source.  Regardless of what server hosts the
-    Corresponding Source, you remain obligated to ensure that it is
-    available for as long as needed to satisfy these requirements.
-
-    e) Convey the object code using peer-to-peer transmission, provided
-    you inform other peers where the object code and Corresponding
-    Source of the work are being offered to the general public at no
-    charge under subsection 6d.
-
-  A separable portion of the object code, whose source code is excluded
-from the Corresponding Source as a System Library, need not be
-included in conveying the object code work.
-
-  A "User Product" is either (1) a "consumer product", which means any
-tangible personal property which is normally used for personal, family,
-or household purposes, or (2) anything designed or sold for incorporation
-into a dwelling.  In determining whether a product is a consumer product,
-doubtful cases shall be resolved in favor of coverage.  For a particular
-product received by a particular user, "normally used" refers to a
-typical or common use of that class of product, regardless of the status
-of the particular user or of the way in which the particular user
-actually uses, or expects or is expected to use, the product.  A product
-is a consumer product regardless of whether the product has substantial
-commercial, industrial or non-consumer uses, unless such uses represent
-the only significant mode of use of the product.
-
-  "Installation Information" for a User Product means any methods,
-procedures, authorization keys, or other information required to install
-and execute modified versions of a covered work in that User Product from
-a modified version of its Corresponding Source.  The information must
-suffice to ensure that the continued functioning of the modified object
-code is in no case prevented or interfered with solely because
-modification has been made.
-
-  If you convey an object code work under this section in, or with, or
-specifically for use in, a User Product, and the conveying occurs as
-part of a transaction in which the right of possession and use of the
-User Product is transferred to the recipient in perpetuity or for a
-fixed term (regardless of how the transaction is characterized), the
-Corresponding Source conveyed under this section must be accompanied
-by the Installation Information.  But this requirement does not apply
-if neither you nor any third party retains the ability to install
-modified object code on the User Product (for example, the work has
-been installed in ROM).
-
-  The requirement to provide Installation Information does not include a
-requirement to continue to provide support service, warranty, or updates
-for a work that has been modified or installed by the recipient, or for
-the User Product in which it has been modified or installed.  Access to a
-network may be denied when the modification itself materially and
-adversely affects the operation of the network or violates the rules and
-protocols for communication across the network.
-
-  Corresponding Source conveyed, and Installation Information provided,
-in accord with this section must be in a format that is publicly
-documented (and with an implementation available to the public in
-source code form), and must require no special password or key for
-unpacking, reading or copying.
-
-  7. Additional Terms.
-
-  "Additional permissions" are terms that supplement the terms of this
-License by making exceptions from one or more of its conditions.
-Additional permissions that are applicable to the entire Program shall
-be treated as though they were included in this License, to the extent
-that they are valid under applicable law.  If additional permissions
-apply only to part of the Program, that part may be used separately
-under those permissions, but the entire Program remains governed by
-this License without regard to the additional permissions.
-
-  When you convey a copy of a covered work, you may at your option
-remove any additional permissions from that copy, or from any part of
-it.  (Additional permissions may be written to require their own
-removal in certain cases when you modify the work.)  You may place
-additional permissions on material, added by you to a covered work,
-for which you have or can give appropriate copyright permission.
-
-  Notwithstanding any other provision of this License, for material you
-add to a covered work, you may (if authorized by the copyright holders of
-that material) supplement the terms of this License with terms:
-
-    a) Disclaiming warranty or limiting liability differently from the
-    terms of sections 15 and 16 of this License; or
-
-    b) Requiring preservation of specified reasonable legal notices or
-    author attributions in that material or in the Appropriate Legal
-    Notices displayed by works containing it; or
-
-    c) Prohibiting misrepresentation of the origin of that material, or
-    requiring that modified versions of such material be marked in
-    reasonable ways as different from the original version; or
-
-    d) Limiting the use for publicity purposes of names of licensors or
-    authors of the material; or
-
-    e) Declining to grant rights under trademark law for use of some
-    trade names, trademarks, or service marks; or
-
-    f) Requiring indemnification of licensors and authors of that
-    material by anyone who conveys the material (or modified versions of
-    it) with contractual assumptions of liability to the recipient, for
-    any liability that these contractual assumptions directly impose on
-    those licensors and authors.
-
-  All other non-permissive additional terms are considered "further
-restrictions" within the meaning of section 10.  If the Program as you
-received it, or any part of it, contains a notice stating that it is
-governed by this License along with a term that is a further
-restriction, you may remove that term.  If a license document contains
-a further restriction but permits relicensing or conveying under this
-License, you may add to a covered work material governed by the terms
-of that license document, provided that the further restriction does
-not survive such relicensing or conveying.
-
-  If you add terms to a covered work in accord with this section, you
-must place, in the relevant source files, a statement of the
-additional terms that apply to those files, or a notice indicating
-where to find the applicable terms.
-
-  Additional terms, permissive or non-permissive, may be stated in the
-form of a separately written license, or stated as exceptions;
-the above requirements apply either way.
-
-  8. Termination.
-
-  You may not propagate or modify a covered work except as expressly
-provided under this License.  Any attempt otherwise to propagate or
-modify it is void, and will automatically terminate your rights under
-this License (including any patent licenses granted under the third
-paragraph of section 11).
-
-  However, if you cease all violation of this License, then your
-license from a particular copyright holder is reinstated (a)
-provisionally, unless and until the copyright holder explicitly and
-finally terminates your license, and (b) permanently, if the copyright
-holder fails to notify you of the violation by some reasonable means
-prior to 60 days after the cessation.
-
-  Moreover, your license from a particular copyright holder is
-reinstated permanently if the copyright holder notifies you of the
-violation by some reasonable means, this is the first time you have
-received notice of violation of this License (for any work) from that
-copyright holder, and you cure the violation prior to 30 days after
-your receipt of the notice.
-
-  Termination of your rights under this section does not terminate the
-licenses of parties who have received copies or rights from you under
-this License.  If your rights have been terminated and not permanently
-reinstated, you do not qualify to receive new licenses for the same
-material under section 10.
-
-  9. Acceptance Not Required for Having Copies.
-
-  You are not required to accept this License in order to receive or
-run a copy of the Program.  Ancillary propagation of a covered work
-occurring solely as a consequence of using peer-to-peer transmission
-to receive a copy likewise does not require acceptance.  However,
-nothing other than this License grants you permission to propagate or
-modify any covered work.  These actions infringe copyright if you do
-not accept this License.  Therefore, by modifying or propagating a
-covered work, you indicate your acceptance of this License to do so.
-
-  10. Automatic Licensing of Downstream Recipients.
-
-  Each time you convey a covered work, the recipient automatically
-receives a license from the original licensors, to run, modify and
-propagate that work, subject to this License.  You are not responsible
-for enforcing compliance by third parties with this License.
-
-  An "entity transaction" is a transaction transferring control of an
-organization, or substantially all assets of one, or subdividing an
-organization, or merging organizations.  If propagation of a covered
-work results from an entity transaction, each party to that
-transaction who receives a copy of the work also receives whatever
-licenses to the work the party's predecessor in interest had or could
-give under the previous paragraph, plus a right to possession of the
-Corresponding Source of the work from the predecessor in interest, if
-the predecessor has it or can get it with reasonable efforts.
-
-  You may not impose any further restrictions on the exercise of the
-rights granted or affirmed under this License.  For example, you may
-not impose a license fee, royalty, or other charge for exercise of
-rights granted under this License, and you may not initiate litigation
-(including a cross-claim or counterclaim in a lawsuit) alleging that
-any patent claim is infringed by making, using, selling, offering for
-sale, or importing the Program or any portion of it.
-
-  11. Patents.
-
-  A "contributor" is a copyright holder who authorizes use under this
-License of the Program or a work on which the Program is based.  The
-work thus licensed is called the contributor's "contributor version".
-
-  A contributor's "essential patent claims" are all patent claims
-owned or controlled by the contributor, whether already acquired or
-hereafter acquired, that would be infringed by some manner, permitted
-by this License, of making, using, or selling its contributor version,
-but do not include claims that would be infringed only as a
-consequence of further modification of the contributor version.  For
-purposes of this definition, "control" includes the right to grant
-patent sublicenses in a manner consistent with the requirements of
-this License.
-
-  Each contributor grants you a non-exclusive, worldwide, royalty-free
-patent license under the contributor's essential patent claims, to
-make, use, sell, offer for sale, import and otherwise run, modify and
-propagate the contents of its contributor version.
-
-  In the following three paragraphs, a "patent license" is any express
-agreement or commitment, however denominated, not to enforce a patent
-(such as an express permission to practice a patent or covenant not to
-sue for patent infringement).  To "grant" such a patent license to a
-party means to make such an agreement or commitment not to enforce a
-patent against the party.
-
-  If you convey a covered work, knowingly relying on a patent license,
-and the Corresponding Source of the work is not available for anyone
-to copy, free of charge and under the terms of this License, through a
-publicly available network server or other readily accessible means,
-then you must either (1) cause the Corresponding Source to be so
-available, or (2) arrange to deprive yourself of the benefit of the
-patent license for this particular work, or (3) arrange, in a manner
-consistent with the requirements of this License, to extend the patent
-license to downstream recipients.  "Knowingly relying" means you have
-actual knowledge that, but for the patent license, your conveying the
-covered work in a country, or your recipient's use of the covered work
-in a country, would infringe one or more identifiable patents in that
-country that you have reason to believe are valid.
-
-  If, pursuant to or in connection with a single transaction or
-arrangement, you convey, or propagate by procuring conveyance of, a
-covered work, and grant a patent license to some of the parties
-receiving the covered work authorizing them to use, propagate, modify
-or convey a specific copy of the covered work, then the patent license
-you grant is automatically extended to all recipients of the covered
-work and works based on it.
-
-  A patent license is "discriminatory" if it does not include within
-the scope of its coverage, prohibits the exercise of, or is
-conditioned on the non-exercise of one or more of the rights that are
-specifically granted under this License.  You may not convey a covered
-work if you are a party to an arrangement with a third party that is
-in the business of distributing software, under which you make payment
-to the third party based on the extent of your activity of conveying
-the work, and under which the third party grants, to any of the
-parties who would receive the covered work from you, a discriminatory
-patent license (a) in connection with copies of the covered work
-conveyed by you (or copies made from those copies), or (b) primarily
-for and in connection with specific products or compilations that
-contain the covered work, unless you entered into that arrangement,
-or that patent license was granted, prior to 28 March 2007.
-
-  Nothing in this License shall be construed as excluding or limiting
-any implied license or other defenses to infringement that may
-otherwise be available to you under applicable patent law.
-
-  12. No Surrender of Others' Freedom.
-
-  If conditions are imposed on you (whether by court order, agreement or
-otherwise) that contradict the conditions of this License, they do not
-excuse you from the conditions of this License.  If you cannot convey a
-covered work so as to satisfy simultaneously your obligations under this
-License and any other pertinent obligations, then as a consequence you may
-not convey it at all.  For example, if you agree to terms that obligate you
-to collect a royalty for further conveying from those to whom you convey
-the Program, the only way you could satisfy both those terms and this
-License would be to refrain entirely from conveying the Program.
-
-  13. Remote Network Interaction; Use with the GNU General Public License.
-
-  Notwithstanding any other provision of this License, if you modify the
-Program, your modified version must prominently offer all users
-interacting with it remotely through a computer network (if your version
-supports such interaction) an opportunity to receive the Corresponding
-Source of your version by providing access to the Corresponding Source
-from a network server at no charge, through some standard or customary
-means of facilitating copying of software.  This Corresponding Source
-shall include the Corresponding Source for any work covered by version 3
-of the GNU General Public License that is incorporated pursuant to the
-following paragraph.
-
-  Notwithstanding any other provision of this License, you have
-permission to link or combine any covered work with a work licensed
-under version 3 of the GNU General Public License into a single
-combined work, and to convey the resulting work.  The terms of this
-License will continue to apply to the part which is the covered work,
-but the work with which it is combined will remain governed by version
-3 of the GNU General Public License.
-
-  14. Revised Versions of this License.
-
-  The Free Software Foundation may publish revised and/or new versions of
-the GNU Affero General Public License from time to time.  Such new versions
-will be similar in spirit to the present version, but may differ in detail to
-address new problems or concerns.
-
-  Each version is given a distinguishing version number.  If the
-Program specifies that a certain numbered version of the GNU Affero General
-Public License "or any later version" applies to it, you have the
-option of following the terms and conditions either of that numbered
-version or of any later version published by the Free Software
-Foundation.  If the Program does not specify a version number of the
-GNU Affero General Public License, you may choose any version ever published
-by the Free Software Foundation.
-
-  If the Program specifies that a proxy can decide which future
-versions of the GNU Affero General Public License can be used, that proxy's
-public statement of acceptance of a version permanently authorizes you
-to choose that version for the Program.
-
-  Later license versions may give you additional or different
-permissions.  However, no additional obligations are imposed on any
-author or copyright holder as a result of your choosing to follow a
-later version.
-
-  15. Disclaimer of Warranty.
-
-  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
-APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
-HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
-OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
-IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
-ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
-
-  16. Limitation of Liability.
-
-  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
-THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY
-GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
-USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF
-DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD
-PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),
-EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGES.
-
-  17. Interpretation of Sections 15 and 16.
-
-  If the disclaimer of warranty and limitation of liability provided
-above cannot be given local legal effect according to their terms,
-reviewing courts shall apply local law that most closely approximates
-an absolute waiver of all civil liability in connection with the
-Program, unless a warranty or assumption of liability accompanies a
-copy of the Program in return for a fee.
-
-                     END OF TERMS AND CONDITIONS
-
-            How to Apply These Terms to Your New Programs
-
-  If you develop a new program, and you want it to be of the greatest
-possible use to the public, the best way to achieve this is to make it
-free software which everyone can redistribute and change under these terms.
-
-  To do so, attach the following notices to the program.  It is safest
-to attach them to the start of each source file to most effectively
-state the exclusion of warranty; and each file should have at least
-the "copyright" line and a pointer to where the full notice is found.
-
-    <one line to give the program's name and a brief idea of what it does.>
-    Copyright (C) <year>  <name of author>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-Also add information on how to contact you by electronic and paper mail.
-
-  If your software can interact with users remotely through a computer
-network, you should also make sure that it provides a way for users to
-get its source.  For example, if your program is a web application, its
-interface could display a "Source" link that leads users to an archive
-of the code.  There are many ways you could offer source, and different
-solutions will be better for different programs; see section 13 for the
-specific requirements.
-
-  You should also get your employer (if you work as a programmer) or school,
-if any, to sign a "copyright disclaimer" for the program, if necessary.
-For more information on this, and how to apply and follow the GNU AGPL, see
-<https://www.gnu.org/licenses/>.
-```

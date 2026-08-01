@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  VitCam — Raspberry Pi Installer
-#  Tested on Raspberry Pi 4B / 5 — Raspberry Pi OS 64-bit (Debian Bookworm)
+#  Tested on Raspberry Pi 4B / 5 — Ubuntu 26.04 LTS (64-bit)
 #  CPU inference only (no CUDA). Supabase via Docker.
 #  Run as a normal user with sudo access:
 #    chmod +x setup/install-raspberry-pi.sh
@@ -33,7 +33,7 @@ error()   { echo -e "${RED}[✗]${RESET} $*"; exit 1; }
 header()  { echo -e "\n${BOLD}${CYAN}══ $* ══${RESET}\n"; }
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
-header "VitCam Installer — Raspberry Pi (Debian Bookworm)"
+header "VitCam Installer — Raspberry Pi (Ubuntu 26.04 LTS)"
 
 if [[ $EUID -eq 0 ]]; then
   error "Do not run as root. Run as a normal user with sudo access."
@@ -48,8 +48,8 @@ info "Architecture: $ARCH — OK"
 info "VitCam directory: $VITCAM_DIR"
 info "Running as: $CURRENT_USER"
 
-# ── Step 1 / 9 — System update & dependencies ─────────────────────────────────
-header "Step 1 / 9 — System update & dependencies"
+# ── Step 1 / 8 — System update & dependencies ─────────────────────────────────
+header "Step 1 / 8 — System update & dependencies"
 
 sudo apt-get update -qq
 sudo apt-get upgrade -y -qq
@@ -61,8 +61,8 @@ sudo apt-get install -y -qq \
 
 success "System dependencies installed."
 
-# ── Step 2 / 9 — Docker Engine ────────────────────────────────────────────────
-header "Step 2 / 9 — Docker Engine"
+# ── Step 2 / 8 — Docker Engine ────────────────────────────────────────────────
+header "Step 2 / 8 — Docker Engine"
 
 if ! command -v docker >/dev/null; then
   info "Installing Docker Engine..."
@@ -78,24 +78,17 @@ if ! groups "$CURRENT_USER" | grep -q docker; then
   warn "Added $CURRENT_USER to docker group."
 fi
 
-# Activate group in current session
-newgrp docker 2>/dev/null || true
-
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# Use sudo if group not yet active in this session
-if ! docker info >/dev/null 2>&1; then
-  warn "Docker group not active yet — using sudo for docker commands."
-  DOCKER_CMD="sudo docker"
-else
-  DOCKER_CMD="docker"
-fi
+# Use sudo for docker commands since group may not be active in current session
+# (newgrp would block the script by opening an interactive subshell)
+DOCKER_CMD="sudo docker"
 
 success "Docker Engine ready."
 
-# ── Step 3 / 9 — Node.js ──────────────────────────────────────────────────────
-header "Step 3 / 9 — Node.js"
+# ── Step 3 / 8 — Node.js ──────────────────────────────────────────────────────
+header "Step 3 / 8 — Node.js"
 
 if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 18 ]]; then
   info "Installing Node.js 22..."
@@ -104,8 +97,8 @@ if ! command -v node >/dev/null || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt 1
 fi
 success "Node.js $(node -v) ready."
 
-# ── Step 4 / 9 — Clone VitCam ─────────────────────────────────────────────────
-header "Step 4 / 9 — Clone VitCam"
+# ── Step 4 / 8 — Clone VitCam ─────────────────────────────────────────────────
+header "Step 4 / 8 — Clone VitCam"
 
 if [[ -d "$VITCAM_DIR/.git" ]]; then
   info "Repository already exists — pulling latest changes."
@@ -115,8 +108,8 @@ else
 fi
 success "Repository ready at $VITCAM_DIR."
 
-# ── Step 5 / 9 — Supabase (Docker) ────────────────────────────────────────────
-header "Step 5 / 9 — Supabase (Docker)"
+# ── Step 5 / 8 — Supabase (Docker) ────────────────────────────────────────────
+header "Step 5 / 8 — Supabase (Docker)"
 
 SUPABASE_DOCKER_DIR="$VITCAM_DIR/supabase/docker"
 
@@ -132,11 +125,9 @@ else
   info "Supabase already cloned."
 fi
 
-# cd supabase/docker
 cd "$SUPABASE_DOCKER_DIR"
 info "Working directory: $(pwd)"
 
-# cp .env.example .env
 if [[ ! -f ".env" ]]; then
   if [[ -f ".env.example" ]]; then
     cp .env.example .env
@@ -154,7 +145,6 @@ sudo mkdir -p volumes/db/data volumes/storage volumes/functions volumes/logs
 sudo chown -R "$CURRENT_USER":"$CURRENT_USER" volumes/
 success "Storage directories ready."
 
-# docker compose up --detach
 info "Starting Supabase containers (first run may take several minutes)..."
 $DOCKER_CMD compose up --detach
 
@@ -189,8 +179,42 @@ else
   fi
 fi
 
-# ── Step 6 / 9 — Configure .env files ─────────────────────────────────────────
-header "Step 6 / 9 — Configure .env files"
+# ── Step 6 / 8 — Configure .env files ─────────────────────────────────────────
+header "Step 6 / 8 — Configure .env files"
+
+# Create skeleton .env files so systemd EnvironmentFile doesn't fail on missing file
+if [[ ! -f "$VITCAM_DIR/server/.env" ]]; then
+  cat > "$VITCAM_DIR/server/.env" << 'ENVEOF'
+SUPABASE_URL=REPLACE_WITH_YOUR_SUPABASE_URL
+SUPABASE_KEY=REPLACE_WITH_YOUR_SUPABASE_ANON_KEY
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8765
+DEFAULT_CODEC=VP9
+DEFAULT_CONTAINER=webm
+DEFAULT_RESOLUTION=640x480
+DEFAULT_FPS=30
+LOG_BUFFER_SIZE=50
+LOG_FLUSH_INTERVAL=10.0
+PERFORMANCE_LOG_INTERVAL=60.0
+DEFAULT_SENSITIVITY=20
+DEFAULT_AREA_THRESHOLD=5000
+WEBRTC_STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+WEBRTC_TURN_SERVER=turn:127.0.0.1:3478
+WEBRTC_TURN_USERNAME=webrtc
+WEBRTC_TURN_CREDENTIAL=webrtc123
+MODEL_SIZE=Nano
+MODEL_CHECKPOINT_PATH=./checkpoints/UAV/checkpoint.pth
+ENVEOF
+  info "Created skeleton server/.env — update SUPABASE_URL and SUPABASE_KEY."
+fi
+
+if [[ ! -f "$VITCAM_DIR/frontend/.env" ]]; then
+  cat > "$VITCAM_DIR/frontend/.env" << 'ENVEOF'
+NEXT_PUBLIC_SUPABASE_URL=REPLACE_WITH_YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=REPLACE_WITH_YOUR_SUPABASE_ANON_KEY
+ENVEOF
+  info "Created skeleton frontend/.env — update values."
+fi
 
 echo ""
 echo -e "${YELLOW}  ACTION REQUIRED — Configure Supabase and update .env files:${RESET}"
@@ -205,25 +229,42 @@ echo ""
 echo -e "  3. Project Settings → API → copy URL and anon key"
 echo ""
 echo -e "  4. Edit: ${CYAN}$VITCAM_DIR/frontend/.env${RESET}"
-echo -e "     Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
+echo -e "     Replace REPLACE_WITH_YOUR_SUPABASE_URL and REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
 echo ""
 echo -e "  5. Edit: ${CYAN}$VITCAM_DIR/server/.env${RESET}"
-echo -e "     Set SUPABASE_URL and SUPABASE_KEY"
+echo -e "     Replace REPLACE_WITH_YOUR_SUPABASE_URL and REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
 echo ""
 echo -e "${YELLOW}  Press ENTER when done...${RESET}"
 read -r
+
+# Validate .env was updated
+SERVER_ENV_VALID=true
+if grep -q "REPLACE_WITH_YOUR_SUPABASE_URL" "$VITCAM_DIR/server/.env" 2>/dev/null; then
+  warn "server/.env still has placeholder SUPABASE_URL."
+  SERVER_ENV_VALID=false
+fi
+if grep -q "REPLACE_WITH_YOUR_SUPABASE_ANON_KEY" "$VITCAM_DIR/server/.env" 2>/dev/null; then
+  warn "server/.env still has placeholder SUPABASE_KEY."
+  SERVER_ENV_VALID=false
+fi
+
+if ! $SERVER_ENV_VALID; then
+  warn "server/.env has not been updated. The server service will start but may not connect to Supabase."
+  warn "After install, edit $VITCAM_DIR/server/.env and run: sudo systemctl restart vitcam-server"
+fi
+
 success ".env configuration done."
 
-# ── Step 7 / 9 — Frontend ─────────────────────────────────────────────────────
-header "Step 7 / 9 — Frontend"
+# ── Step 7 / 8 — Frontend ─────────────────────────────────────────────────────
+header "Step 7 / 8 — Frontend"
 
 cd "$VITCAM_DIR/frontend"
 npm install --silent
 npm run build
 success "Frontend built."
 
-# ── Step 8 / 9 — Python / pyenv ───────────────────────────────────────────────
-header "Step 8 / 9 — Python $PYTHON_VERSION (pyenv)"
+# ── Step 8 / 8 — Python / pyenv + Backend + nginx + systemd ──────────────────
+header "Step 8 / 8 — Python, Backend, nginx & systemd"
 
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -256,51 +297,10 @@ if ! grep -q 'pyenv init' ~/.bashrc; then
   } >> ~/.bashrc
 fi
 
-# ── Step 9 / 9 — Backend, nginx & systemd ────────────────────────────────────
-header "Step 9 / 9 — Backend dependencies, nginx & systemd"
-
+# Backend dependencies
 cd "$VITCAM_DIR/server"
 pip install -q -r requirements.txt
 success "Backend dependencies installed."
-
-# ── Coral USB TPU support ─────────────────────────────────────────────────────
-header "Coral USB TPU Setup"
-
-info "Adding Google Coral Edge TPU package repository..."
-echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
-  | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
-
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/google-coral-edgetpu.gpg
-
-# Modernise apt sources to avoid deprecated key warnings
-sudo apt modernize-sources 2>/dev/null || true
-sudo apt-get update -qq
-
-# Install Edge TPU runtime
-# libedgetpu1-std  = standard clock speed (cooler, recommended for most use)
-# libedgetpu1-max  = maximum clock speed (faster, runs hot — use with active cooling)
-info "Installing Edge TPU runtime (standard clock speed)..."
-sudo apt-get install -y libedgetpu1-std
-info "Installing Edge TPU runtime (max clock speed)..."
-sudo apt-get install -y libedgetpu1-max
-success "Edge TPU runtime installed."
-
-# Check if Coral USB TPU is connected
-info "Checking for Coral USB TPU device..."
-if lsusb | grep -qE "1a6e:089a|18d1:9302"; then
-  success "Coral USB TPU detected: $(lsusb | grep -E '1a6e:089a|18d1:9302')"
-else
-  warn "Coral USB TPU not detected. Plug in the device and check with: lsusb"
-  warn "Expected device ID: 1a6e:089a or 18d1:9302 (Global Unichip or Google)"
-fi
-
-# Install Python dependencies for Coral / TFLite inference
-info "Installing tflite-runtime and ultralytics..."
-pip uninstall -y tensorflow tensorflow-aarch64 2>/dev/null || true
-pip install -U tflite-runtime
-pip install ultralytics
-success "Coral TPU Python dependencies installed."
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
 sudo tee /etc/nginx/sites-available/vitcam > /dev/null << NGINXCONF
@@ -379,7 +379,6 @@ ExecStart=${PYTHON_BIN} main.py
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=${VITCAM_DIR}/server/.env
-Environment="SUPABASE_URL=http://localhost:8000"
 
 [Install]
 WantedBy=multi-user.target
@@ -397,7 +396,7 @@ echo -e "${GREEN}${BOLD}  VitCam installed successfully!${RESET}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════${RESET}"
 echo ""
 RPI_IP=$(hostname -I | awk '{print $1}')
-echo -e "  Inference mode:  ${YELLOW}CPU + Coral USB TPU (if connected)${RESET}"
+echo -e "  Inference mode:  ${YELLOW}CPU (no CUDA on Raspberry Pi)${RESET}"
 echo -e "  Frontend:        ${CYAN}http://${RPI_IP}${RESET}  (port 80 via nginx)"
 echo -e "  Frontend direct: ${CYAN}http://localhost:${FRONTEND_PORT}${RESET}"
 echo -e "  Backend API:     ${CYAN}http://localhost:${SERVER_PORT}${RESET}"
@@ -407,7 +406,6 @@ echo -e "${YELLOW}  Next steps:${RESET}"
 echo -e "  1. Open Supabase Studio → Authentication → Users"
 echo -e "     and confirm your login user was created"
 echo -e "  2. Open ${CYAN}http://${RPI_IP}${RESET} from any device on your network"
-echo -e "  3. Coral USB TPU: plug in the device and verify with: ${BOLD}lsusb | grep -E '1a6e|18d1'${RESET}"
 echo ""
 echo -e "  Service commands:"
 echo -e "    ${BOLD}sudo systemctl status vitcam-frontend${RESET}"
@@ -415,6 +413,10 @@ echo -e "    ${BOLD}sudo systemctl status vitcam-server${RESET}"
 echo -e "    ${BOLD}sudo journalctl -u vitcam-server -f${RESET}     (live server logs)"
 echo -e "    ${BOLD}sudo journalctl -u vitcam-frontend -f${RESET}   (live frontend logs)"
 echo -e "    ${BOLD}sudo systemctl restart vitcam-server${RESET}"
+echo ""
+echo -e "  ${YELLOW}If SUPABASE_URL is missing or invalid:${RESET}"
+echo -e "    1. Edit ${CYAN}$VITCAM_DIR/server/.env${RESET} and set SUPABASE_URL and SUPABASE_KEY"
+echo -e "    2. Run: ${BOLD}sudo systemctl restart vitcam-server${RESET}"
 echo ""
 echo -e "  Supabase:  ${BOLD}cd $VITCAM_DIR/supabase/docker && $DOCKER_CMD compose ps${RESET}"
 echo -e "  nginx:     ${BOLD}sudo systemctl status nginx${RESET} | ${BOLD}sudo nginx -t${RESET}"
