@@ -21,12 +21,27 @@ try:
 except ImportError:
     ort = None
 
+# Edge ONNX models are pulled from the Hugging Face Hub (cached locally after the
+# first download). Imported defensively for the same reason as onnxruntime.
+try:
+    from huggingface_hub import hf_hub_download
+except ImportError:
+    hf_hub_download = None
+
 
 logger = logging.getLogger(__name__)
 
 class CameraPredictorFactory:
     """Factory for creating camera predictors with shared model resources"""
-    
+
+    # ── Edge ONNX models on the Hugging Face Hub ──────────────────────────────
+    # Each repo contains a single `model.onnx`. These are resolved via
+    # hf_hub_download at load time (see _resolve_hf_onnx). Override here (or move
+    # to settings) if the repos change.
+    HF_EDGE_ONNX_FILENAME = "model.onnx"
+    HF_EDGE_BBOX_REPO     = "scwoods/vitcam-rfdetr-nano"      # detection
+    HF_EDGE_SEG_REPO      = "scwoods/vitcam-rfdetr-seg-nano"  # segmentation
+
     _model_instance = None
     _model_lock = asyncio.Lock()
     
@@ -101,11 +116,13 @@ class CameraPredictorFactory:
                 model.optimize_for_inference(compile=False) 
             
             elif camera_config.modelsize == "Edge" and camera_config.detectiontype == 'BoundingBox':
-                # Edge backend: self-hosted ONNX model served via ONNX Runtime.
-                # `model` becomes an onnxruntime.InferenceSession — the object
-                # CameraPredictorWithAnalytics._predict_onnx drives (it calls
-                # get_inputs()/run() on it). No Ultralytics/YOLO involved.
-                model = cls._build_onnx_session(settings.MODEL_CHECKPOINT_PATH)
+                # Edge detection: ONNX model pulled from the Hugging Face Hub and
+                # served via ONNX Runtime. `model` becomes an
+                # onnxruntime.InferenceSession — the object
+                # CameraPredictorWithAnalytics._predict_onnx drives. No YOLO.
+                model = cls._build_onnx_session(
+                    cls._resolve_hf_onnx(cls.HF_EDGE_BBOX_REPO)
+                )
             
             
             if camera_config.modelsize == "Large" and camera_config.detectiontype == 'Segmentation':
@@ -125,11 +142,13 @@ class CameraPredictorFactory:
                 model.optimize_for_inference(compile=False) 
 
             elif camera_config.modelsize  == "Edge" and camera_config.detectiontype == 'Segmentation':
-                # Edge segmentation: ONNX seg model. rfdetr's forward_export emits
-                # dets + labels + masks, and CameraPredictorWithAnalytics._predict_onnx
-                # reads the mask output and renders it via MaskAnnotator. Same
-                # InferenceSession contract as the BoundingBox Edge branch.
-                model = cls._build_onnx_session(settings.SEG_MODEL_CHECKPOINT_PATH)
+                # Edge segmentation: ONNX seg model from the Hugging Face Hub
+                # (forward_export emits dets + labels + masks). Same
+                # InferenceSession contract as the Edge detection branch; the
+                # predictor reads the mask output and renders it via MaskAnnotator.
+                model = cls._build_onnx_session(
+                    cls._resolve_hf_onnx(cls.HF_EDGE_SEG_REPO)
+                )
             
         
             logger.info(f"Loading model {camera_config.modelsize} on device: {device}")
@@ -151,6 +170,34 @@ class CameraPredictorFactory:
         except Exception as e:
             logger.error(f"Failed to initialize model: {e}")
             raise
+
+    @staticmethod
+    def _resolve_hf_onnx(repo_id: str, filename: str = None) -> str:
+        """
+        Download an Edge ONNX model from the Hugging Face Hub and return its
+        local path.
+
+        hf_hub_download caches the file (under the HF cache dir), so this only
+        hits the network on the first run for a given repo/revision; subsequent
+        loads resolve straight from cache — important for offline Edge devices
+        after their initial provisioning.
+
+        For private repos, set an HF token: either `HF_TOKEN` in the environment
+        / `huggingface-cli login`, or a `HF_TOKEN` field on settings (used here
+        if present).
+        """
+        if hf_hub_download is None:
+            raise ImportError(
+                "huggingface_hub is required to load Edge ONNX models from the "
+                "Hub but is not installed. Install it with "
+                "`pip install huggingface_hub`."
+            )
+
+        filename = filename or CameraPredictorFactory.HF_EDGE_ONNX_FILENAME
+        token = getattr(settings, "HF_TOKEN", None)  # None → anonymous/ambient
+        path = hf_hub_download(repo_id=repo_id, filename=filename, token=token)
+        logger.info(f"Resolved ONNX model '{repo_id}/{filename}' -> {path}")
+        return path
 
     @staticmethod
     def _build_onnx_session(model_path: str):

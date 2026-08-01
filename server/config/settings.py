@@ -16,7 +16,6 @@ class Settings:
      # Model Configuration - Small, Meduim, Large
     MODEL_SIZE= os.getenv("MODEL_SIZE")
     MODEL_CHECKPOINT_PATH = os.getenv("MODEL_CHECKPOINT_PATH")
-    SEG_MODEL_CHECKPOINT_PATH = os.getenv("SEG_MODEL_CHECKPOINT_PATH")
     WEBRTC_STUN_SERVERS = os.getenv("WEBRTC_STUN_SERVERS")
     WEBRTC_TURN_SERVER = os.getenv("WEBRTC_TURN_SERVER")
     WEBRTC_TURN_USERNAME = os.getenv("WEBRTC_TURN_USERNAME")
