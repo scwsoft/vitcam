@@ -4,6 +4,8 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen)](https://github.com/scwsoft/vitcam)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/scwsoft)
+[![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/scwsoft)
 
 **ViTCam is a fully local, on-premises AI-powered camera surveillance, video analytics, and NVR (Network Video Recorder) platform.** Built for homes, businesses, and organizations that require complete control over their security footage — ViTCam runs entirely on your own hardware, stores all recordings locally, and never sends video data to any external server or cloud service.
 
@@ -34,6 +36,7 @@ ViTCam's AI detection runs on **both GPU and CPU** — so you can get started on
   - [Setting Up the Camera Server](#setting-up-the-camera-server)
   - [Adding a Camera](#adding-a-camera)
 - [AI Models](#ai-models)
+- [Support the Project](#support-the-project)
 - [License](#license)
 
 ---
@@ -826,6 +829,19 @@ The goal is to give every ViTCam user access to models that are ready to use wit
 
 ---
 
+
+## Support the Project
+
+ViTCam is free and open source, built and maintained by a solo developer. If it's useful to you, consider supporting continued development:
+
+- **[GitHub Sponsors](https://github.com/sponsors/scwsoft)** — recurring monthly support
+- **[Ko-fi](https://ko-fi.com/scwsoft)** — one-off contributions
+
+Sponsorships help cover hardware for testing, model training compute, and the time to keep building. Every contribution is genuinely appreciated.
+
+You can also help for free by starring the repo, reporting bugs, or sharing ViTCam with others who might find it useful.
+
+---
 
 ## License
 
